@@ -3852,6 +3852,9 @@
     // ========== GAME INITIALIZATION ==========
     let game3D = null; // Global 3D game instance
     
+    // AbortController so we can cleanly remove game listeners each session
+    let _gameInputController = null;
+
     function initGame(data) {
       console.log('🎮 Initializing game...', data);
       
@@ -3867,17 +3870,47 @@
       gameState.buildings = gameState.buildings || [];
       gameState.chests    = gameState.chests    || [];
 
-      // Reset key state fresh for this game session
-      window._pixelioKeys  = {};
+      // Fresh key state
+      window._pixelioKeys   = {};
       window._pixelioMouseX = 0;
       window._pixelioMouseY = 0;
 
-      // Reset controls flag so listeners register cleanly
-      controlsSetup = false;
-      setupGameControls();
-      
+      // Remove any previous game's input listeners cleanly
+      if (_gameInputController) _gameInputController.abort();
+      _gameInputController = new AbortController();
+      const sig = { signal: _gameInputController.signal };
+
+      window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        window._pixelioKeys[k] = true;
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) {
+          e.preventDefault();
+        }
+        if (k === 'e') {
+          if (window.nearbyChestId) {
+            socket.emit('open-chest', { chestId: window.nearbyChestId });
+            window.nearbyChestId = null;
+          } else if (window.nearbyDoorId) {
+            socket.emit('toggle-door', { doorId: window.nearbyDoorId });
+          } else if (window.nearbyStairs) {
+            socket.emit('use-stairs', { direction: -1 });
+          }
+        }
+        if (k === 'q' && window.nearbyStairs) socket.emit('use-stairs', { direction: 1 });
+      }, sig);
+
+      window.addEventListener('keyup', (e) => {
+        window._pixelioKeys[e.key.toLowerCase()] = false;
+      }, sig);
+
+      window.addEventListener('mousemove', (e) => {
+        window._pixelioMouseX = e.clientX;
+        window._pixelioMouseY = e.clientY;
+      }, sig);
+
       // Destroy any old 3D instance
       if (game3D) { game3D.destroy(); game3D = null; }
+      if (window._inputInterval) { clearInterval(window._inputInterval); window._inputInterval = null; }
 
       // Initialize 3D engine
       if (typeof THREE !== 'undefined' && typeof Pixelio3D !== 'undefined') {
@@ -3889,7 +3922,17 @@
           
           // Send inputs at 60fps
           window._inputInterval = setInterval(() => {
-            if (game3D) game3D.sendInputs(socket);
+            if (game3D && socket && window._pixelioKeys) {
+              const k = window._pixelioKeys;
+              socket.emit('player-input', {
+                up:    k['w'] || k['arrowup']    || false,
+                down:  k['s'] || k['arrowdown']  || false,
+                left:  k['a'] || k['arrowleft']  || false,
+                right: k['d'] || k['arrowright'] || false,
+                mouseX: window._pixelioMouseX || 0,
+                mouseY: window._pixelioMouseY || 0
+              });
+            }
           }, 1000 / 60);
           
         } catch (error) {
@@ -3903,69 +3946,9 @@
     }
     
     // Prevent duplicate event listeners
-    let controlsSetup = false;
+    // (input setup is handled inside initGame using AbortController)
     
-    function setupGameControls() {
-      if (controlsSetup) return;
-      controlsSetup = true;
-      console.log('🎮 Controls setup');
-      
-      // Keyboard controls — write into shared window._pixelioKeys
-      window.addEventListener('keydown', (e) => {
-        const k = e.key.toLowerCase();
-        window._pixelioKeys[k] = true;
-        // Prevent page scroll on arrow keys/space
-        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) {
-          e.preventDefault();
-        }
-        
-        // E key interactions
-        if (k === 'e') {
-          if (window.nearbyChestId) {
-            socket.emit('open-chest', { chestId: window.nearbyChestId });
-            window.nearbyChestId = null;
-          } else if (window.nearbyDoorId) {
-            socket.emit('toggle-door', { doorId: window.nearbyDoorId });
-          } else if (window.nearbyStairs) {
-            socket.emit('use-stairs', { direction: -1 });
-          }
-        }
-        
-        if (k === 'q' && window.nearbyStairs) {
-          socket.emit('use-stairs', { direction: 1 });
-        }
-      });
-      
-      window.addEventListener('keyup', (e) => {
-        window._pixelioKeys[e.key.toLowerCase()] = false;
-      });
-      
-      // Mouse tracking for shooting direction
-      document.addEventListener('mousemove', (e) => {
-        window._pixelioMouseX = e.clientX;
-        window._pixelioMouseY = e.clientY;
-      });
-      
-      document.addEventListener('click', (e) => {
-        socket.emit('player-shoot', {
-          targetX: e.clientX,
-          targetY: e.clientY
-        });
-      });
-    }
-    
-    function sendInputs() {
-      if (!socket || !gameState || !window._pixelioKeys) return;
-      const keys = window._pixelioKeys;
-      socket.emit('player-input', {
-        up:    keys['w'] || keys['arrowup']    || false,
-        down:  keys['s'] || keys['arrowdown']  || false,
-        left:  keys['a'] || keys['arrowleft']  || false,
-        right: keys['d'] || keys['arrowright'] || false,
-        mouseX: window._pixelioMouseX || 0,
-        mouseY: window._pixelioMouseY || 0
-      });
-    }
+    // sendInputs is inlined in initGame's setInterval
     
     // ========== GAME LOOP ==========
     function gameLoop() {
@@ -5009,7 +4992,8 @@
       socket.on('player-died', (data) => {
         console.log('💀 You died!', data);
         
-        // Clean up 3D engine and input loop
+        // Clean up input listeners, interval, and 3D engine
+        if (_gameInputController) { _gameInputController.abort(); _gameInputController = null; }
         if (window._inputInterval) { clearInterval(window._inputInterval); window._inputInterval = null; }
         if (game3D) { game3D.destroy(); game3D = null; }
         
@@ -5026,7 +5010,8 @@
       socket.on('game-ended', (data) => {
         console.log('🎮 Game ended!', data);
         
-        // Clean up 3D engine and input loop
+        // Clean up input listeners, interval, and 3D engine
+        if (_gameInputController) { _gameInputController.abort(); _gameInputController = null; }
         if (window._inputInterval) { clearInterval(window._inputInterval); window._inputInterval = null; }
         if (game3D) { game3D.destroy(); game3D = null; }
         
@@ -5075,9 +5060,54 @@
     
     // ========== SKIN SELECTOR ==========
     let selectedSkin = 'default';
-    
+
+    // CharacterRenderer — draws 2D skin previews on canvas elements in the menu
+    const CharacterRenderer = {
+      skins: {
+        default:    { name: 'Default',    color: '#667eea', rarity: 'common'    },
+        peely:      { name: 'Peely',      color: '#FFD700', rarity: 'uncommon'  },
+        pug:        { name: 'Pug',        color: '#D2691E', rarity: 'uncommon'  },
+        cyber_ninja:{ name: 'Cyber Ninja',color: '#00FFFF', rarity: 'epic'      },
+        galaxy:     { name: 'Galaxy',     color: '#9370DB', rarity: 'legendary' },
+        lava:       { name: 'Lava',       color: '#FF4500', rarity: 'rare'      },
+        ice:        { name: 'Ice',        color: '#ADD8E6', rarity: 'rare'      },
+        golden:     { name: 'Golden',     color: '#FFD700', rarity: 'legendary' },
+        pink:       { name: 'Pink Bot',   color: '#FF69B4', rarity: 'uncommon'  },
+        shadow:     { name: 'Shadow',     color: '#2d2d2d', rarity: 'epic'      },
+        ocean:      { name: 'Ocean',      color: '#1E90FF', rarity: 'rare'      },
+        flame:      { name: 'Flame',      color: '#FF4500', rarity: 'rare'      },
+      },
+      render(ctx, skinId, size) {
+        const skin = this.skins[skinId] || this.skins.default;
+        const c = skin.color;
+        const s = size;
+        // Body
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.roundRect(-s*0.4, -s*0.15, s*0.8, s*0.75, s*0.1);
+        ctx.fill();
+        // Head
+        ctx.beginPath();
+        ctx.arc(0, -s*0.35, s*0.32, 0, Math.PI*2);
+        ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(-s*0.1, -s*0.38, s*0.08, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc( s*0.1, -s*0.38, s*0.08, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#222';
+        ctx.beginPath(); ctx.arc(-s*0.1, -s*0.37, s*0.04, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc( s*0.1, -s*0.37, s*0.04, 0, Math.PI*2); ctx.fill();
+        // Arms
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.roundRect(-s*0.65, -s*0.1, s*0.22, s*0.5, s*0.08); ctx.fill();
+        ctx.beginPath(); ctx.roundRect( s*0.43, -s*0.1, s*0.22, s*0.5, s*0.08); ctx.fill();
+        // Legs
+        ctx.beginPath(); ctx.roundRect(-s*0.3, s*0.55, s*0.24, s*0.45, s*0.07); ctx.fill();
+        ctx.beginPath(); ctx.roundRect( s*0.06, s*0.55, s*0.24, s*0.45, s*0.07); ctx.fill();
+      }
+    };
+
     function loadSkinSelector() {
-      const skinGrid = document.getElementById('skin-grid');
       if (!skinGrid) {
         console.warn('Skin grid not found');
         return;
