@@ -376,28 +376,7 @@
       color: #666;
     }
     
-    /* ========== SKIN SELECTOR ========== */
-    .skin-selector {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 15px;
-      padding: 20px;
-      margin: 20px 0;
-    }
-    
-    .skin-selector h3 {
-      color: white;
-      text-align: center;
-      margin-bottom: 15px;
-      font-size: 18px;
-    }
-    
-    .skin-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-      gap: 10px;
-      max-height: 220px;
-      overflow-y: auto;
-      padding: 5px;
+    /* skin-selector removed - locker preview replaces it */
     }
     
     .skin-card {
@@ -1393,19 +1372,20 @@
         </div>
       </div>
       
-      <!-- Skin Selector -->
-      <div class="skin-selector">
-        <h3>🤖 Choose Your Robot</h3>
-        <div class="skin-grid" id="skin-grid">
-          <!-- Skins will be populated here -->
+      <!-- Locker Preview -->
+      <div id="menu-locker-preview" style="background: rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; margin: 20px 0; display: flex; align-items: center; gap: 20px; cursor: pointer;" onclick="openLocker()">
+        <canvas id="menu-player-preview" width="80" height="100" style="border-radius: 10px; background: rgba(255,255,255,0.15);"></canvas>
+        <div>
+          <div style="color: white; font-size: 18px; font-weight: bold;" id="menu-skin-name">Default</div>
+          <div style="color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 4px;">Click to open Locker</div>
         </div>
+        <div style="margin-left: auto; color: rgba(255,255,255,0.6); font-size: 24px;">›</div>
       </div>
 
       <div class="menu-buttons">
         <button class="menu-button primary-button" onclick="quickPlay()">⚡ Quick Play</button>
         <button class="menu-button secondary-button" onclick="showJoinGameModal()">Join Private Game</button>
         <button class="menu-button secondary-button" onclick="createGame()">Create Private Game</button>
-        <button class="menu-button secondary-button" onclick="openLocker()" style="background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%); margin-top: 10px;">🎒 Locker</button>
         <button class="menu-button secondary-button" onclick="openMapStudio()" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-top: 10px;">🗺️ Create Map</button>
         <button id="admin-button" class="menu-button admin-button" onclick="openAdminPanel()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); margin-top: 20px; display: none;">🛠️ Admin Panel</button>
       </div>
@@ -2360,7 +2340,28 @@
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'block';
       updateUserDisplay();
-      loadSkinSelector(); // Load robot skins!
+      updateMenuLockerPreview();
+    }
+
+    function updateMenuLockerPreview() {
+      const canvas = document.getElementById('menu-player-preview');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Get equipped skin from locker state
+      const skinId = window.playerLoadout?.skin || 'default';
+      const skin = CharacterRenderer.skins[skinId] || CharacterRenderer.skins.default;
+
+      // Update name label
+      const nameEl = document.getElementById('menu-skin-name');
+      if (nameEl) nameEl.textContent = skin.name;
+
+      // Draw the character centered in the canvas
+      ctx.save();
+      ctx.translate(40, 60);
+      CharacterRenderer.render(ctx, skinId, 32);
+      ctx.restore();
     }
     
     function showLobbyScreen() {
@@ -5805,6 +5806,7 @@
     window.closeLocker = function() {
       document.getElementById('character-customizer').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'flex';
+      updateMenuLockerPreview();
     };
     
     window.switchLockerTab = function(tab) {
