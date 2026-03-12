@@ -300,3 +300,70 @@ function _buildPlayerMesh_safe(colorHex, engine) {
 }
 
 window.Pixelio3D = Pixelio3D;
+
+// Render the player model into a small preview canvas (used by locker/menu)
+function renderModelPreview(canvas, skinId, skinColors) {
+  if (!canvas || typeof THREE === 'undefined' || typeof PLAYER_MODEL_NODES === 'undefined') return;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(w, h);
+  renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = false;
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+  camera.position.set(0, 55, 120);
+  camera.lookAt(0, 35, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(50, 80, 50);
+  scene.add(sun);
+
+  const colorHex = (skinColors && skinColors[skinId]) ? skinColors[skinId] : 0x667eea;
+  const mat = new THREE.MeshLambertMaterial({ color: colorHex });
+  const group = new THREE.Group();
+
+  PLAYER_MODEL_NODES.forEach(node => {
+    const md = PLAYER_MODEL_MESHES[node.mesh];
+    if (!md) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(md.pos), 3));
+    if (md.norm && md.norm.length) {
+      geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(md.norm), 3));
+    } else {
+      geo.computeVertexNormals();
+    }
+    geo.setIndex(new THREE.BufferAttribute(new Uint32Array(md.idx), 1));
+    const mesh = new THREE.Mesh(geo, mat.clone());
+    mesh.position.set(...node.t);
+    mesh.scale.set(...node.s);
+    mesh.quaternion.set(node.r[0], node.r[1], node.r[2], node.r[3]);
+    group.add(mesh);
+  });
+
+  group.scale.set(14, 14, 14);
+  scene.add(group);
+
+  // Slow rotation animation
+  let frame;
+  let angle = 0;
+  function animate() {
+    frame = requestAnimationFrame(animate);
+    angle += 0.012;
+    group.rotation.y = angle;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Store cleanup on canvas so caller can stop it
+  canvas._previewCleanup = () => {
+    cancelAnimationFrame(frame);
+    renderer.dispose();
+  };
+}
+
+window.renderModelPreview = renderModelPreview;
