@@ -5000,11 +5000,10 @@
         // Hide game screen
         document.getElementById('game-screen').style.display = 'none';
         
-        // Show death message
+        // Return to menu - force visible
         alert(`💀 You were eliminated! Killed by: ${data.killerName}`);
-        
-        // Return to menu
         showMenuScreen();
+        document.getElementById('menu-screen').style.zIndex = '9999';
       });
       
       socket.on('game-ended', (data) => {
@@ -5018,11 +5017,34 @@
         // Hide game screen
         document.getElementById('game-screen').style.display = 'none';
         
-        // Show winner alert
+        // Show winner screen
         alert(`🎉 Game Over! Winner: ${data.winner}`);
         
-        // Return to menu
+        // Return to menu - force it visible above everything
         showMenuScreen();
+        document.getElementById('menu-screen').style.zIndex = '9999';
+      });
+
+      // Admin broadcast notifications
+      socket.on('admin-message', (data) => {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 20px 30px;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+          z-index: 9999999;
+          max-width: 400px;
+          font-size: 16px;
+          font-weight: 600;
+        `;
+        notification.innerHTML = `<div style="font-size:14px;opacity:0.9;margin-bottom:8px;">📢 Admin Announcement</div><div>${data.message}</div>`;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
       });
     }
     
@@ -5108,6 +5130,7 @@
     };
 
     function loadSkinSelector() {
+      const skinGrid = document.getElementById('skin-grid');
       if (!skinGrid) {
         console.warn('Skin grid not found');
         return;
@@ -5452,36 +5475,7 @@
       }
     }
     
-    // Listen for admin broadcasts
-    socket.on('admin-message', (data) => {
-      // Show notification
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        z-index: 9999999;
-        max-width: 400px;
-        font-size: 16px;
-        font-weight: 600;
-        animation: slideIn 0.3s ease;
-      `;
-      notification.innerHTML = `
-        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">📢 Admin Announcement</div>
-        <div>${data.message}</div>
-      `;
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-      }, 5000);
-    });
+    // admin-message listener is registered in setupGameSockets() below
     
     // ========== MAP STUDIO ==========
     let studioEngine = null;
