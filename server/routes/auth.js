@@ -56,17 +56,25 @@ router.post('/signup', async (req, res) => {
 // ========== LOGIN ==========
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, password, email } = req.body;
     
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    // Support both old 'email' field and new 'identifier' field
+    const loginValue = identifier || email;
+    
+    if (!loginValue || !password) {
+      return res.status(400).json({ error: 'Username/email and password are required' });
     }
     
-    // Find user
-    const user = await User.findOne({ email });
+    // Find user by username OR email (case-insensitive)
+    const user = await User.findOne({
+      $or: [
+        { email: loginValue.toLowerCase() },
+        { username: { $regex: new RegExp(`^${loginValue}$`, 'i') } }
+      ]
+    });
+    
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid username/email or password' });
     }
     
     // Check password
