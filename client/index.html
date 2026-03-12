@@ -3855,42 +3855,42 @@
     function initGame(data) {
       console.log('🎮 Initializing game...', data);
       
-      // HIDE ALL MENU SCREENS!
+      // Hide all screens
       document.getElementById('menu-screen').style.display = 'none';
       document.getElementById('lobby-screen').style.display = 'none';
       document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('game-screen').style.display = 'none'; // Hide 2D canvas too
-      
-      console.log('🙈 All menu screens hidden');
+      document.getElementById('game-screen').style.display = 'none';
       
       // Store game state
       gameState = data;
-      gameState.bullets = gameState.bullets || [];
+      gameState.bullets   = gameState.bullets   || [];
       gameState.buildings = gameState.buildings || [];
-      gameState.chests = gameState.chests || [];
+      gameState.chests    = gameState.chests    || [];
 
-      // Initialize shared key state (read by 3D engine sendInputs)
-      window._pixelioKeys = {};
+      // Reset key state fresh for this game session
+      window._pixelioKeys  = {};
       window._pixelioMouseX = 0;
       window._pixelioMouseY = 0;
 
-      // Setup keyboard listeners
+      // Reset controls flag so listeners register cleanly
+      controlsSetup = false;
       setupGameControls();
       
-      // Initialize SIMPLE 3D Engine
+      // Destroy any old 3D instance
+      if (game3D) { game3D.destroy(); game3D = null; }
+
+      // Initialize 3D engine
       if (typeof THREE !== 'undefined' && typeof Pixelio3D !== 'undefined') {
         try {
           game3D = new Pixelio3D();
           game3D.setMyPlayer(socket.id);
           game3D.createBuildings(gameState.buildings, gameState.map.size);
-          console.log('✅ Simple 3D Engine started!');
+          console.log('✅ 3D Engine started!');
           
-          // Send inputs to server at 60fps
-          setInterval(() => {
-            if (game3D) {
-              game3D.sendInputs(socket);
-            }
-          }, 1000/60);
+          // Send inputs at 60fps
+          window._inputInterval = setInterval(() => {
+            if (game3D) game3D.sendInputs(socket);
+          }, 1000 / 60);
           
         } catch (error) {
           console.error('❌ 3D Error:', error);
@@ -3900,10 +3900,6 @@
         console.error('❌ THREE or Pixelio3D not loaded!');
         alert('THREE or Pixelio3D not loaded! Check console.');
       }
-      
-      console.log(`📍 Map size: ${gameState.map.size}`);
-      console.log(`🏠 Buildings: ${gameState.buildings.length}`);
-      console.log(`📦 Chests: ${gameState.chests.length}`);
     }
     
     // Prevent duplicate event listeners
@@ -5013,11 +5009,9 @@
       socket.on('player-died', (data) => {
         console.log('💀 You died!', data);
         
-        // Clean up 3D engine
-        if (game3D) {
-          game3D.destroy();
-          game3D = null;
-        }
+        // Clean up 3D engine and input loop
+        if (window._inputInterval) { clearInterval(window._inputInterval); window._inputInterval = null; }
+        if (game3D) { game3D.destroy(); game3D = null; }
         
         // Hide game screen
         document.getElementById('game-screen').style.display = 'none';
@@ -5032,11 +5026,9 @@
       socket.on('game-ended', (data) => {
         console.log('🎮 Game ended!', data);
         
-        // Clean up 3D engine
-        if (game3D) {
-          game3D.destroy();
-          game3D = null;
-        }
+        // Clean up 3D engine and input loop
+        if (window._inputInterval) { clearInterval(window._inputInterval); window._inputInterval = null; }
+        if (game3D) { game3D.destroy(); game3D = null; }
         
         // Hide game screen
         document.getElementById('game-screen').style.display = 'none';
