@@ -195,6 +195,8 @@ class Pixelio3D {
     });
 
     group.scale.set(14, 14, 14);
+    // Rotate 180° so model faces +Z (forward direction)
+    group.rotation.y = Math.PI;
     return group;
   }
 
@@ -222,10 +224,10 @@ class Pixelio3D {
 
     const k = window._pixelioKeys;
     let dx = 0, dz = 0;
-    if (k['w'] || k['arrowup'])    dz -= frameSpeed;
-    if (k['s'] || k['arrowdown'])  dz += frameSpeed;
-    if (k['a'] || k['arrowleft'])  dx -= frameSpeed;
-    if (k['d'] || k['arrowright']) dx += frameSpeed;
+    if (k['w'] || k['arrowup'])    dz += frameSpeed;  // forward = +Z (away from camera)
+    if (k['s'] || k['arrowdown'])  dz -= frameSpeed;  // back = -Z
+    if (k['a'] || k['arrowleft'])  dx -= frameSpeed;  // left = -X
+    if (k['d'] || k['arrowright']) dx += frameSpeed;  // right = +X
 
     // Normalize diagonal
     if (dx !== 0 && dz !== 0) {
@@ -252,7 +254,7 @@ class Pixelio3D {
     if (!me) return;
 
     me.group.position.set(this._localX, 0, this._localZ);
-    me.group.rotation.y = this._localFacing;
+    me.group.rotation.y = this._localFacing + Math.PI;
 
     // Subtle idle bob — gentle up/down so model feels alive without animation
     const t = performance.now() / 1000;
@@ -313,26 +315,24 @@ class Pixelio3D {
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    const camDist   = 180;  // distance behind player
-    const camHeight = 120;  // height above ground
+    const camDist   = 180;
+    const camHeight = 120;
+    const facing    = this._localFacing || 0;
 
-    const facing = this._localFacing || 0;
-
-    // Target position: directly behind the player
+    // Camera sits BEHIND player: opposite of facing direction
+    // facing=0 means player faces +Z, so camera goes to -Z side
     const targetX = me.group.position.x - Math.sin(facing) * camDist;
     const targetZ = me.group.position.z - Math.cos(facing) * camDist;
-    const targetY = camHeight;
 
-    // Smooth follow — 0.15 feels responsive without being jerky
     this.camera.position.x += (targetX - this.camera.position.x) * 0.15;
     this.camera.position.z += (targetZ - this.camera.position.z) * 0.15;
-    this.camera.position.y += (targetY - this.camera.position.y) * 0.15;
+    this.camera.position.y += (camHeight - this.camera.position.y) * 0.15;
 
-    // Look slightly ahead of the player, not just at their feet
+    // Look slightly ahead of player
     this.camera.lookAt(
-      me.group.position.x + Math.sin(facing) * 40,
+      me.group.position.x + Math.sin(facing) * 50,
       20,
-      me.group.position.z + Math.cos(facing) * 40
+      me.group.position.z + Math.cos(facing) * 50
     );
   }
 

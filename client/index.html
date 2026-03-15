@@ -2190,6 +2190,7 @@
       socket.on('connect', () => {
         console.log('Connected to server');
         setupGameSockets();
+        initChatHandlers();
         showMenuScreen();
         
         // Show admin button if user is admin
@@ -2954,17 +2955,20 @@
       }
     }
 
-    // Chat keyboard handling — set up once on DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', () => {
+    // Chat keyboard handling
+    // NOTE: not wrapped in DOMContentLoaded — runs after socket is available
+    function initChatHandlers() {
       const chatInput = document.getElementById('chat-input');
       if (!chatInput) return;
 
       chatInput.addEventListener('keydown', (e) => {
-        e.stopPropagation(); // prevent WASD/arrows from moving player while typing
+        e.stopPropagation();
         if (e.key === 'Enter') {
           const msg = chatInput.value.trim();
-          if (msg && socket) {
-            socket.emit('send-chat-message', { message: msg });
+          if (msg) {
+            if (socket && !socket.disconnected) {
+              socket.emit('send-chat-message', { message: msg });
+            }
             chatInput.value = '';
           }
           closeChat();
@@ -2974,7 +2978,7 @@
           closeChat();
         }
       });
-    });
+    }
 
     // Press Enter during gameplay to open chat
     window.addEventListener('keydown', (e) => {
@@ -3973,7 +3977,7 @@
         drawPOILabels(); // POI names like Fortnite!
         drawBuildings(); // Buildings first
         drawChests(); // Chests on buildings
-        drawStorm();
+        drawZone();
         drawTriviaStations();
         drawPowerups();
         drawWeapons();
@@ -4619,13 +4623,11 @@
       }
     }
     
-    function drawStorm() {
-      if (!gameState || !gameState.stormRadius) return;
+    function drawZone() {
+      if (!gameState || !gameState.zoneRadius) return;
       
-      // Draw Glitch Zone with electric cyan effect
       ctx.save();
       
-      // Animated flicker offset using time
       const t = Date.now() / 300;
       const flicker = Math.sin(t) * 3;
 
@@ -4635,24 +4637,24 @@
         ctx.lineWidth = 18 * i;
         ctx.beginPath();
         ctx.arc(
-          gameState.stormCenter.x - camera.x,
-          gameState.stormCenter.y - camera.y,
-          gameState.stormRadius + (12 * i) + flicker,
+          gameState.zoneCenter.x - camera.x,
+          gameState.zoneCenter.y - camera.y,
+          gameState.zoneRadius + (12 * i) + flicker,
           0, Math.PI * 2
         );
         ctx.stroke();
       }
       
-      // Main Glitch Zone line — electric cyan dashes
+      // Main zone boundary line — animated electric cyan dashes
       ctx.strokeStyle = '#00ffdc';
       ctx.lineWidth = 4;
       ctx.setLineDash([20, 8]);
-      ctx.lineDashOffset = -Date.now() / 40; // animated dash march
+      ctx.lineDashOffset = -Date.now() / 40;
       ctx.beginPath();
       ctx.arc(
-        gameState.stormCenter.x - camera.x,
-        gameState.stormCenter.y - camera.y,
-        gameState.stormRadius,
+        gameState.zoneCenter.x - camera.x,
+        gameState.zoneCenter.y - camera.y,
+        gameState.zoneRadius,
         0, Math.PI * 2
       );
       ctx.stroke();
@@ -4662,9 +4664,9 @@
       ctx.fillStyle = 'rgba(0, 255, 220, 0.9)';
       ctx.font = 'bold 13px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('⚡ GLITCH ZONE',
-        gameState.stormCenter.x - camera.x,
-        gameState.stormCenter.y - camera.y - gameState.stormRadius - 12
+      ctx.fillText('⚡ DANGER ZONE',
+        gameState.zoneCenter.x - camera.x,
+        gameState.zoneCenter.y - camera.y - gameState.zoneRadius - 12
       );
       
       ctx.restore();
@@ -4984,8 +4986,8 @@
         
         // Update game state
         if (!gameState) gameState = {};
-        if (data.stormRadius !== undefined) gameState.stormRadius = data.stormRadius;
-        if (data.stormCenter) gameState.stormCenter = data.stormCenter;
+        if (data.zoneRadius !== undefined) gameState.zoneRadius = data.zoneRadius;
+        if (data.zoneCenter) gameState.zoneCenter = data.zoneCenter;
         if (data.triviaStations) gameState.triviaStations = data.triviaStations;
         if (data.powerups) gameState.powerups = data.powerups;
         if (data.weaponSpawns) gameState.weaponSpawns = data.weaponSpawns;

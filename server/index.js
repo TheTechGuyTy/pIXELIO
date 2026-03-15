@@ -227,8 +227,8 @@ const MAPS = {
 const MAP_SIZE = 2000; // Default for backwards compatibility
 const PLAYER_SIZE = 30;
 const TICK_RATE = 60;
-const STORM_SHRINK_RATE = 0.15; // MUCH SLOWER! Was 0.5
-const STORM_DAMAGE_SCALING = true; // Increases damage over time
+const ZONE_SHRINK_RATE = 0.15; // MUCH SLOWER! Was 0.5
+const ZONE_DAMAGE_SCALING = true; // Increases damage over time
 
 const WEAPONS = {
   pistol: { name: 'Pistol', damage: 15, fireRate: 400, ammoUse: 1, range: 300, speed: 15, rarity: 'common' },
@@ -564,9 +564,9 @@ io.on('connection', (socket) => {
       mapType: 'classic',
       map: MAPS.classic,
       startTime: null,
-      stormRadius: MAPS.classic.size / 2,
-      stormCenter: { x: MAPS.classic.size / 2, y: MAPS.classic.size / 2 },
-      stormPhase: 0,
+      zoneRadius: MAPS.classic.size / 2,
+      zoneCenter: { x: MAPS.classic.size / 2, y: MAPS.classic.size / 2 },
+      zonePhase: 0,
       triviaStations: [],
       bullets: [],
       buildings: [], // [{id, type, material, x, y, health, ownerId, rotation}]
@@ -734,8 +734,8 @@ io.on('connection', (socket) => {
     
     io.to(gameId).emit('game-started', {
       map: game.map,
-      stormCenter: game.stormCenter,
-      stormRadius: game.stormRadius,
+      zoneCenter: game.zoneCenter,
+      zoneRadius: game.zoneRadius,
       triviaStations: game.triviaStations,
       powerups: game.powerups,
       weaponSpawns: game.weaponSpawns,
@@ -1585,44 +1585,44 @@ function startGameLoop(gameId) {
       }
     }
     
-    // Update storm
+    // Update danger zone
     const gameTime = Date.now() - game.startTime;
     
     // Storm phases (damage increases over time)
-    if (gameTime > 180000 && game.stormPhase < 3) game.stormPhase = 3; // 3 min
-    else if (gameTime > 120000 && game.stormPhase < 2) game.stormPhase = 2; // 2 min
-    else if (gameTime > 60000 && game.stormPhase < 1) game.stormPhase = 1; // 1 min
+    if (gameTime > 180000 && game.zonePhase < 3) game.zonePhase = 3; // 3 min
+    else if (gameTime > 120000 && game.zonePhase < 2) game.zonePhase = 2; // 2 min
+    else if (gameTime > 60000 && game.zonePhase < 1) game.zonePhase = 1; // 1 min
     
-    if (game.stormRadius > 50) {
-      game.stormRadius -= STORM_SHRINK_RATE;
+    if (game.zoneRadius > 50) {
+      game.zoneRadius -= ZONE_SHRINK_RATE;
     }
     
     // Damage players outside storm
-    const stormDamage = STORM_DAMAGE_SCALING ? [2, 5, 10, 20][game.stormPhase] : 2;
+    const zoneDamage = ZONE_DAMAGE_SCALING ? [2, 5, 10, 20][game.zonePhase] : 2;
     
     for (const player of game.players.values()) {
       if (!player.isAlive) continue;
       
-      const distToCenter = Math.hypot(player.x - game.stormCenter.x, player.y - game.stormCenter.y);
-      if (distToCenter > game.stormRadius) {
-        player.health -= stormDamage;
-        player.damageTaken += stormDamage;
+      const distToCenter = Math.hypot(player.x - game.zoneCenter.x, player.y - game.zoneCenter.y);
+      if (distToCenter > game.zoneRadius) {
+        player.health -= zoneDamage;
+        player.damageTaken += zoneDamage;
         
         if (player.health <= 0) {
           player.isAlive = false;
           player.health = 0;
           
           game.killFeed.unshift({
-            killer: 'Glitch Zone',
+            killer: 'Danger Zone',
             victim: player.username,
-            weapon: 'glitch_zone',
+            weapon: 'danger_zone',
             timestamp: Date.now()
           });
 
           // Tell the eliminated player directly
           io.to(playerId).emit('player-died', {
-            killerName: 'the Glitch Zone',
-            weapon: 'glitch_zone'
+            killerName: 'the Danger Zone',
+            weapon: 'danger_zone'
           });
         }
       }
@@ -1670,9 +1670,9 @@ function startGameLoop(gameId) {
       weaponSpawns: game.weaponSpawns,
       vehicles: game.vehicles,
       chests: game.chests,
-      stormRadius: game.stormRadius,
-      stormCenter: game.stormCenter,
-      stormPhase: game.stormPhase,
+      zoneRadius: game.zoneRadius,
+      zoneCenter: game.zoneCenter,
+      zonePhase: game.zonePhase,
       killFeed: game.killFeed,
       triviaStations: game.triviaStations
     });
