@@ -1512,9 +1512,18 @@ function startGameLoop(gameId) {
             
             if (game.killFeed.length > 5) game.killFeed.pop();
             
+            // Tell the eliminated player directly
+            const killerName = shooter ? shooter.username : 'Unknown';
+            io.to(playerId).emit('player-died', {
+              killerName,
+              weapon: bullet.weapon
+            });
+
+            // Tell everyone else who got eliminated
             io.to(gameId).emit('player-eliminated', {
               playerId,
-              killerId: bullet.owner
+              killerId: bullet.owner,
+              killerName
             });
           }
           
@@ -1609,6 +1618,12 @@ function startGameLoop(gameId) {
             weapon: 'glitch_zone',
             timestamp: Date.now()
           });
+
+          // Tell the eliminated player directly
+          io.to(playerId).emit('player-died', {
+            killerName: 'the Glitch Zone',
+            weapon: 'glitch_zone'
+          });
         }
       }
     }
@@ -1625,7 +1640,8 @@ function startGameLoop(gameId) {
       await saveGameResults(game, winner);
       
       io.to(gameId).emit('game-ended', {
-        winner: winner ? winner.username : 'None',
+        winner: winner ? winner.username : 'Nobody',
+        winnerId: winner ? winner.id : null,
         stats: Array.from(game.players.values()).map(p => ({
           username: p.username,
           kills: p.kills,
