@@ -63,46 +63,45 @@ const PLAYER_MODEL_NODES = [
   {name:"Cube",mesh:"Mesh",t:[0, 2.962684, 0],s:[0.929233, 1.487666, 1],r:[0, 0, 0, 1]},
   {name:"Cube.001",mesh:"Mesh.001",t:[0, 4.321608, 0],s:[1, 1, 1],r:[0, 0, 0, 1]},
   {name:"Cube.002",mesh:"Mesh.003",t:[0, 3.20695, -1.597694],s:[0.363841, 2.02958, 0.361189],r:[0.009098, 0.712379, -0.701669, 0.009669]},
-];// PIXELIO 3D ENGINE V3 — Uses actual GLB geometry, no external loaders
+];// PIXELIO 3D ENGINE V4 — Client prediction + behind-player camera
 class Pixelio3D {
   constructor() {
-    console.log('🎮 Pixelio 3D v3 Starting...');
+    console.log('🎮 Pixelio 3D v4 Starting...');
     this.scene      = null;
     this.camera     = null;
     this.renderer   = null;
     this.players    = new Map();   // socketId -> { group, x, y }
     this.myPlayerId = null;
     this.buildings  = [];
+
+    // Client-side prediction state
+    this._localX    = null;  // predicted local player position
+    this._localZ    = null;
+    this._localFacing = 0;   // facing angle in radians
+    this._mapHalf   = 2500;
+    this._speed     = 5;     // must match server speed
+
     this.skinColors = {
-      default: 0x8899cc,
-      pink:    0xFF69B4,
-      gold:    0xFFD700,
-      shadow:  0x444466,
-      galaxy:  0x9370DB,
-      cyber:   0x00FFFF,
-      flame:   0xFF4500,
-      ocean:   0x1E90FF
+      default: 0x8899cc, pink: 0xFF69B4, gold:   0xFFD700,
+      shadow:  0x444466, galaxy: 0x9370DB, cyber: 0x00FFFF,
+      flame:   0xFF4500, ocean:  0x1E90FF
     };
     this._init();
   }
 
   _init() {
-    // Scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87CEEB);
     this.scene.fog = new THREE.Fog(0x87CEEB, 2000, 9000);
 
-    // Camera
+    // Camera starts behind — will be repositioned every frame
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 12000);
-    this.camera.position.set(0, 200, 350);
 
-    // Canvas — z-index 100 so it shows but doesn't steal input focus weirdly
     const canvas = document.createElement('canvas');
     canvas.id = 'pixelio-3d-canvas';
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:100;pointer-events:none;';
     document.body.appendChild(canvas);
 
-    // Renderer
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -114,14 +113,9 @@ class Pixelio3D {
     sun.position.set(300, 500, 300);
     sun.castShadow = true;
     sun.shadow.mapSize.setScalar(2048);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far  = 2000;
-    [-600,600].forEach(v => {
-      sun.shadow.camera.left   = -600;
-      sun.shadow.camera.right  =  600;
-      sun.shadow.camera.top    =  600;
-      sun.shadow.camera.bottom = -600;
-    });
+    sun.shadow.camera.left = sun.shadow.camera.bottom = -600;
+    sun.shadow.camera.right = sun.shadow.camera.top = 600;
+    sun.shadow.camera.far = 2000;
     this.scene.add(sun);
     const fill = new THREE.DirectionalLight(0xadd8ff, 0.35);
     fill.position.set(-300, 200, -300);
@@ -150,10 +144,9 @@ class Pixelio3D {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    console.log('✅ 3D Engine v3 ready');
+    console.log('✅ 3D Engine v4 ready');
   }
 
-  // Build one player group from the extracted GLB geometry
   _buildPlayerMesh(colorHex) {
     const group = new THREE.Group();
     const mat   = new THREE.MeshLambertMaterial({ color: colorHex });
@@ -161,7 +154,6 @@ class Pixelio3D {
     PLAYER_MODEL_NODES.forEach(node => {
       const md = PLAYER_MODEL_MESHES[node.mesh];
       if (!md) return;
-
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(md.pos), 3));
       if (md.norm && md.norm.length) {
@@ -170,20 +162,15 @@ class Pixelio3D {
         geo.computeVertexNormals();
       }
       geo.setIndex(new THREE.BufferAttribute(new Uint32Array(md.idx), 1));
-
       const mesh = new THREE.Mesh(geo, mat.clone());
-      mesh.castShadow    = true;
+      mesh.castShadow = true;
       mesh.receiveShadow = true;
-
-      // Apply node transform
       mesh.position.set(...node.t);
       mesh.scale.set(...node.s);
       mesh.quaternion.set(node.r[0], node.r[1], node.r[2], node.r[3]);
-
       group.add(mesh);
     });
 
-    // Scale the whole player to a good in-game size
     group.scale.set(14, 14, 14);
     return group;
   }
@@ -191,15 +178,49 @@ class Pixelio3D {
   _spawnPlayer(socketId, skinId) {
     if (this.players.has(socketId)) return;
     const color = this.skinColors[skinId] || this.skinColors.default;
-    const group = _buildPlayerMesh_safe(color, this);
+    const group = this._buildPlayerMesh(color);
     this.scene.add(group);
     this.players.set(socketId, { group, x: 0, y: 0 });
-    console.log(`👤 Player spawned: ${socketId} skin=${skinId}`);
+    console.log(`👤 Spawned: ${socketId} skin=${skinId}`);
   }
 
-  setMyPlayer(id) {
+  setMyPlayer(id, mapSize) {
     this.myPlayerId = id;
+    if (mapSize) this._mapHalf = mapSize / 2;
     console.log('🎮 My player ID:', id);
+  }
+
+  // Called every frame to apply client-side prediction to local player
+  _applyPrediction() {
+    if (!this.myPlayerId || !window._pixelioKeys || !window._gameActive) return;
+    if (this._localX === null) return; // not yet initialized from server
+
+    const k = window._pixelioKeys;
+    let dx = 0, dz = 0;
+    if (k['w'] || k['arrowup'])    dz -= this._speed;
+    if (k['s'] || k['arrowdown'])  dz += this._speed;
+    if (k['a'] || k['arrowleft'])  dx -= this._speed;
+    if (k['d'] || k['arrowright']) dx += this._speed;
+
+    // Normalize diagonal
+    if (dx !== 0 && dz !== 0) {
+      const mag = Math.sqrt(dx*dx + dz*dz);
+      dx = (dx / mag) * this._speed;
+      dz = (dz / mag) * this._speed;
+    }
+
+    if (dx !== 0 || dz !== 0) {
+      this._localX += dx;
+      this._localZ += dz;
+      this._localFacing = Math.atan2(dx, dz);
+    }
+
+    // Apply to local player mesh immediately
+    const me = this.players.get(this.myPlayerId);
+    if (me) {
+      me.group.position.set(this._localX, 0, this._localZ);
+      if (dx !== 0 || dz !== 0) me.group.rotation.y = this._localFacing;
+    }
   }
 
   updatePlayers(playersArray, mapSize) {
@@ -209,21 +230,34 @@ class Pixelio3D {
 
     playersArray.forEach(p => {
       seen.add(p.id);
-      if (!this.players.has(p.id)) {
-        this._spawnPlayer(p.id, p.skin || 'default');
-      }
+      if (!this.players.has(p.id)) this._spawnPlayer(p.id, p.skin || 'default');
+
       const entry = this.players.get(p.id);
       if (!entry) return;
 
       const wx = p.x - half;
       const wz = p.y - half;
-      entry.x = wx;
-      entry.y = wz;
-      entry.group.position.set(wx, 0, wz);
 
-      // Face movement direction
-      if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
-        entry.group.rotation.y = Math.atan2(p.vx, p.vy);
+      if (p.id === this.myPlayerId) {
+        // Server reconciliation — only snap if too far off (>50 units)
+        if (this._localX === null) {
+          // First update — initialize prediction from server
+          this._localX = wx;
+          this._localZ = wz;
+        } else if (Math.hypot(this._localX - wx, this._localZ - wz) > 50) {
+          // Drift correction — snap back
+          this._localX = wx;
+          this._localZ = wz;
+        }
+        // Don't overwrite position here — prediction handles it in _animate
+      } else {
+        // Other players: interpolate smoothly toward server position
+        entry.x += (wx - entry.x) * 0.25;
+        entry.y += (wz - entry.y) * 0.25;
+        entry.group.position.set(entry.x, 0, entry.y);
+        if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
+          entry.group.rotation.y = Math.atan2(p.vx, p.vy);
+        }
       }
     });
 
@@ -234,17 +268,30 @@ class Pixelio3D {
         this.players.delete(id);
       }
     });
+  }
+
+  _updateCamera() {
+    if (!this.myPlayerId) return;
+    const me = this.players.get(this.myPlayerId);
+    if (!me) return;
+
+    // Position the camera behind the player based on their facing direction
+    const camDist   = 280;  // distance behind
+    const camHeight = 160;  // height above player
+
+    const facing = this._localFacing !== undefined ? this._localFacing : 0;
+
+    // "Behind" means opposite of facing direction
+    const behindX = me.group.position.x - Math.sin(facing) * camDist;
+    const behindZ = me.group.position.z - Math.cos(facing) * camDist;
 
     // Smooth camera follow
-    if (this.myPlayerId && this.players.has(this.myPlayerId)) {
-      const me = this.players.get(this.myPlayerId);
-      const tx = me.x;
-      const tz = me.y + 350;
-      this.camera.position.x += (tx - this.camera.position.x) * 0.1;
-      this.camera.position.z += (tz - this.camera.position.z) * 0.1;
-      this.camera.position.y  = 200;
-      this.camera.lookAt(me.x, 0, me.y);
-    }
+    this.camera.position.x += (behindX - this.camera.position.x) * 0.12;
+    this.camera.position.z += (behindZ - this.camera.position.z) * 0.12;
+    this.camera.position.y += (camHeight - this.camera.position.y) * 0.12;
+
+    // Always look at the player
+    this.camera.lookAt(me.group.position.x, 30, me.group.position.z);
   }
 
   createBuildings(buildings, mapSize) {
@@ -257,8 +304,7 @@ class Pixelio3D {
         new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
       );
       mesh.position.set(b.x - half, h / 2, b.y - half);
-      mesh.castShadow    = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = mesh.receiveShadow = true;
       this.scene.add(mesh);
       this.buildings.push(mesh);
     });
@@ -266,20 +312,13 @@ class Pixelio3D {
   }
 
   sendInputs(socket) {
-    if (!socket || !window._pixelioKeys) return;
-    const k = window._pixelioKeys;
-    socket.emit('player-input', {
-      up:    k['w'] || k['arrowup']    || false,
-      down:  k['s'] || k['arrowdown']  || false,
-      left:  k['a'] || k['arrowleft']  || false,
-      right: k['d'] || k['arrowright'] || false,
-      mouseX: window._pixelioMouseX || 0,
-      mouseY: window._pixelioMouseY || 0
-    });
+    // No-op — inputs are sent from the global interval in index.html
   }
 
   _animate() {
     requestAnimationFrame(() => this._animate());
+    this._applyPrediction();
+    this._updateCamera();
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -290,28 +329,22 @@ class Pixelio3D {
     }
     this.players.clear();
     this.buildings = [];
+    this._localX = null;
+    this._localZ = null;
     console.log('🗑️ 3D Engine destroyed');
   }
 }
 
-// Safe wrapper handles the `this` context issue in _spawnPlayer calling _buildPlayerMesh
-function _buildPlayerMesh_safe(colorHex, engine) {
-  return engine._buildPlayerMesh(colorHex);
-}
-
 window.Pixelio3D = Pixelio3D;
 
-// Render the player model into a small preview canvas (used by locker/menu)
 function renderModelPreview(canvas, skinId, skinColors) {
   if (!canvas || typeof THREE === 'undefined' || typeof PLAYER_MODEL_NODES === 'undefined') return;
+  if (canvas._previewCleanup) { canvas._previewCleanup(); canvas._previewCleanup = null; }
 
-  const w = canvas.width;
-  const h = canvas.height;
-
+  const w = canvas.width, h = canvas.height;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setSize(w, h);
   renderer.setClearColor(0x000000, 0);
-  renderer.shadowMap.enabled = false;
 
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
@@ -324,7 +357,7 @@ function renderModelPreview(canvas, skinId, skinColors) {
   scene.add(sun);
 
   const colorHex = (skinColors && skinColors[skinId]) ? skinColors[skinId] : 0x667eea;
-  const mat = new THREE.MeshLambertMaterial({ color: colorHex });
+  const mat   = new THREE.MeshLambertMaterial({ color: colorHex });
   const group = new THREE.Group();
 
   PLAYER_MODEL_NODES.forEach(node => {
@@ -334,9 +367,7 @@ function renderModelPreview(canvas, skinId, skinColors) {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(md.pos), 3));
     if (md.norm && md.norm.length) {
       geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(md.norm), 3));
-    } else {
-      geo.computeVertexNormals();
-    }
+    } else { geo.computeVertexNormals(); }
     geo.setIndex(new THREE.BufferAttribute(new Uint32Array(md.idx), 1));
     const mesh = new THREE.Mesh(geo, mat.clone());
     mesh.position.set(...node.t);
@@ -348,9 +379,7 @@ function renderModelPreview(canvas, skinId, skinColors) {
   group.scale.set(14, 14, 14);
   scene.add(group);
 
-  // Slow rotation animation
-  let frame;
-  let angle = 0;
+  let frame, angle = 0;
   function animate() {
     frame = requestAnimationFrame(animate);
     angle += 0.012;
@@ -359,11 +388,7 @@ function renderModelPreview(canvas, skinId, skinColors) {
   }
   animate();
 
-  // Store cleanup on canvas so caller can stop it
-  canvas._previewCleanup = () => {
-    cancelAnimationFrame(frame);
-    renderer.dispose();
-  };
+  canvas._previewCleanup = () => { cancelAnimationFrame(frame); renderer.dispose(); };
 }
 
 window.renderModelPreview = renderModelPreview;

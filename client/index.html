@@ -3895,7 +3895,7 @@
       if (typeof THREE !== 'undefined' && typeof Pixelio3D !== 'undefined') {
         try {
           game3D = new Pixelio3D();
-          game3D.setMyPlayer(socket.id);
+          game3D.setMyPlayer(socket.id, gameState.map.size);
           game3D.createBuildings(gameState.buildings, gameState.map.size);
           console.log('✅ 3D Engine started!');
         } catch (error) {
