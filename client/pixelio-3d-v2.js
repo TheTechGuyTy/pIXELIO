@@ -191,36 +191,51 @@ class Pixelio3D {
   }
 
   // Called every frame to apply client-side prediction to local player
-  _applyPrediction() {
+  _applyPrediction(delta) {
     if (!this.myPlayerId || !window._pixelioKeys || !window._gameActive) return;
-    if (this._localX === null) return; // not yet initialized from server
+    if (this._localX === null) return;
+
+    const frameSpeed = this._speed * (delta * 60);  // scale to 60fps baseline
 
     const k = window._pixelioKeys;
     let dx = 0, dz = 0;
-    if (k['w'] || k['arrowup'])    dz -= this._speed;
-    if (k['s'] || k['arrowdown'])  dz += this._speed;
-    if (k['a'] || k['arrowleft'])  dx -= this._speed;
-    if (k['d'] || k['arrowright']) dx += this._speed;
+    if (k['w'] || k['arrowup'])    dz -= frameSpeed;
+    if (k['s'] || k['arrowdown'])  dz += frameSpeed;
+    if (k['a'] || k['arrowleft'])  dx -= frameSpeed;
+    if (k['d'] || k['arrowright']) dx += frameSpeed;
 
     // Normalize diagonal
     if (dx !== 0 && dz !== 0) {
       const mag = Math.sqrt(dx*dx + dz*dz);
-      dx = (dx / mag) * this._speed;
-      dz = (dz / mag) * this._speed;
+      dx = (dx / mag) * frameSpeed;
+      dz = (dz / mag) * frameSpeed;
     }
 
-    if (dx !== 0 || dz !== 0) {
+    const moving = dx !== 0 || dz !== 0;
+
+    if (moving) {
       this._localX += dx;
       this._localZ += dz;
-      this._localFacing = Math.atan2(dx, dz);
+      // Smoothly rotate toward new facing direction instead of snapping
+      const targetFacing = Math.atan2(dx, dz);
+      // Shortest-path angle lerp
+      let diff = targetFacing - this._localFacing;
+      if (diff > Math.PI)  diff -= Math.PI * 2;
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      this._localFacing += diff * 0.25;
     }
 
-    // Apply to local player mesh immediately
     const me = this.players.get(this.myPlayerId);
-    if (me) {
-      me.group.position.set(this._localX, 0, this._localZ);
-      if (dx !== 0 || dz !== 0) me.group.rotation.y = this._localFacing;
-    }
+    if (!me) return;
+
+    me.group.position.set(this._localX, 0, this._localZ);
+    me.group.rotation.y = this._localFacing;
+
+    // Subtle idle bob — gentle up/down so model feels alive without animation
+    const t = performance.now() / 1000;
+    const bobAmt = moving ? 1.8 : 0.4;
+    const bobSpeed = moving ? 8 : 2;
+    me.group.position.y = Math.sin(t * bobSpeed) * bobAmt;
   }
 
   updatePlayers(playersArray, mapSize) {
@@ -275,23 +290,27 @@ class Pixelio3D {
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    // Position the camera behind the player based on their facing direction
-    const camDist   = 280;  // distance behind
-    const camHeight = 160;  // height above player
+    const camDist   = 180;  // distance behind player
+    const camHeight = 120;  // height above ground
 
-    const facing = this._localFacing !== undefined ? this._localFacing : 0;
+    const facing = this._localFacing || 0;
 
-    // "Behind" means opposite of facing direction
-    const behindX = me.group.position.x - Math.sin(facing) * camDist;
-    const behindZ = me.group.position.z - Math.cos(facing) * camDist;
+    // Target position: directly behind the player
+    const targetX = me.group.position.x - Math.sin(facing) * camDist;
+    const targetZ = me.group.position.z - Math.cos(facing) * camDist;
+    const targetY = camHeight;
 
-    // Smooth camera follow
-    this.camera.position.x += (behindX - this.camera.position.x) * 0.12;
-    this.camera.position.z += (behindZ - this.camera.position.z) * 0.12;
-    this.camera.position.y += (camHeight - this.camera.position.y) * 0.12;
+    // Smooth follow — 0.15 feels responsive without being jerky
+    this.camera.position.x += (targetX - this.camera.position.x) * 0.15;
+    this.camera.position.z += (targetZ - this.camera.position.z) * 0.15;
+    this.camera.position.y += (targetY - this.camera.position.y) * 0.15;
 
-    // Always look at the player
-    this.camera.lookAt(me.group.position.x, 30, me.group.position.z);
+    // Look slightly ahead of the player, not just at their feet
+    this.camera.lookAt(
+      me.group.position.x + Math.sin(facing) * 40,
+      20,
+      me.group.position.z + Math.cos(facing) * 40
+    );
   }
 
   createBuildings(buildings, mapSize) {
@@ -317,7 +336,8 @@ class Pixelio3D {
 
   _animate() {
     requestAnimationFrame(() => this._animate());
-    this._applyPrediction();
+    const delta = this._clock.getDelta();
+    this._applyPrediction(delta);
     this._updateCamera();
     this.renderer.render(this.scene, this.camera);
   }
