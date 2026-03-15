@@ -734,62 +734,7 @@
     }
 
     /* ========== CHAT WINDOW ========== */
-    .chat-window {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      width: 350px;
-      height: 300px;
-      background: rgba(0, 0, 0, 0.8);
-      border-radius: 10px;
-      display: none;
-      flex-direction: column;
-    }
-
-    .chat-window.active {
-      display: flex;
-    }
-
-    .chat-header {
-      padding: 10px;
-      background: rgba(102, 126, 234, 0.5);
-      border-radius: 10px 10px 0 0;
-      color: white;
-      font-weight: bold;
-    }
-
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-      color: white;
-    }
-
-    .chat-message {
-      margin-bottom: 8px;
-      padding: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-    }
-
-    .chat-username {
-      font-weight: bold;
-      color: #667eea;
-    }
-
-    .chat-input-container {
-      padding: 10px;
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 0 0 10px 10px;
-    }
-
-    .chat-input {
-      width: 100%;
-      padding: 8px;
-      border: none;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.9);
-    }
+    /* chat window now handled inline on the element */
 
     /* ========== VOICE CHAT CONTROLS ========== */
     .voice-controls {
@@ -2084,14 +2029,7 @@
     <!-- Keep 2D canvas hidden as fallback -->
     <canvas id="game-canvas" style="display: none;"></canvas>
     
-    <!-- Chat Window (in-game) -->
-    <div class="chat-window" id="game-chat">
-      <div class="chat-header">Chat (Press Enter)</div>
-      <div class="chat-messages" id="chat-messages"></div>
-      <div class="chat-input-container">
-        <input type="text" class="chat-input" id="chat-input" placeholder="Type a message..." maxlength="200">
-      </div>
-    </div>
+    <!-- Chat moved to body level for 3D overlay -->
 
     <!-- Voice Controls (in-game) -->
     <div class="voice-controls" id="voice-controls">
@@ -2103,6 +2041,18 @@
     </div>
   </div>
   <div id="postgame-screen"></div>
+
+  <!-- ===== CHAT OVERLAY (sits on top of 3D canvas) ===== -->
+  <div id="game-chat" style="display:none; position:fixed; bottom:20px; left:20px; width:320px; height:280px; background:rgba(0,0,0,0.75); border-radius:12px; flex-direction:column; z-index:500; font-family:inherit;">
+    <div style="padding:8px 14px; background:rgba(102,126,234,0.6); border-radius:12px 12px 0 0; color:white; font-weight:bold; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+      💬 Chat <span style="font-size:11px; opacity:0.7;">Enter to send · Esc to close</span>
+    </div>
+    <div id="chat-messages" style="flex:1; overflow-y:auto; padding:8px 10px; color:white; font-size:13px;"></div>
+    <div style="padding:8px; background:rgba(0,0,0,0.4); border-radius:0 0 12px 12px;">
+      <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="200"
+        style="width:100%; padding:7px 10px; border:none; border-radius:6px; background:rgba(255,255,255,0.9); font-size:13px; box-sizing:border-box; outline:none;">
+    </div>
+  </div>
 
   <script>
     // ========== GLOBAL STATE ==========
@@ -2339,6 +2289,10 @@
     function showMenuScreen() {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'block';
+      // Hide chat overlay when back in menu
+      const chat = document.getElementById('game-chat');
+      if (chat) chat.style.display = 'none';
+      _chatOpen = false;
       updateUserDisplay();
       updateMenuLockerPreview();
     }
@@ -2919,25 +2873,80 @@
     }
 
     // ========== CHAT SYSTEM ==========
-    function addChatMessage(msg) {
-      const container = document.getElementById('chat-messages');
-      const div = document.createElement('div');
-      div.className = 'chat-message';
-      div.innerHTML = `<span class="chat-username">${msg.username}:</span> ${msg.message}`;
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
+    let _chatOpen = false;
+
+    function openChat() {
+      const chat = document.getElementById('game-chat');
+      const input = document.getElementById('chat-input');
+      if (!chat || !input) return;
+      chat.style.display = 'flex';
+      _chatOpen = true;
+      // Pause movement while typing
+      window._pixelioKeys = {};
+      setTimeout(() => input.focus(), 10);
     }
 
-    // Chat input handling
+    function closeChat() {
+      const chat = document.getElementById('game-chat');
+      const input = document.getElementById('chat-input');
+      if (!chat) return;
+      chat.style.display = 'none';
+      _chatOpen = false;
+      input.blur();
+    }
+
+    function addChatMessage(msg) {
+      const container = document.getElementById('chat-messages');
+      if (!container) return;
+
+      // Sanitize display — strip HTML tags
+      const safe = (str) => str.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      const div = document.createElement('div');
+      div.style.cssText = 'margin-bottom:6px; padding:5px 7px; background:rgba(255,255,255,0.1); border-radius:5px; word-break:break-word;';
+      div.innerHTML = `<span style="font-weight:bold;color:#a5b4fc;">${safe(msg.username)}:</span> <span>${safe(msg.message)}</span>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+
+      // Flash the chat window briefly if it's closed so players know a message arrived
+      if (!_chatOpen && window._gameActive) {
+        const chat = document.getElementById('game-chat');
+        chat.style.display = 'flex';
+        chat.style.opacity = '0.85';
+        clearTimeout(window._chatFadeTimer);
+        window._chatFadeTimer = setTimeout(() => {
+          if (!_chatOpen) chat.style.display = 'none';
+        }, 3000);
+      }
+    }
+
+    // Chat keyboard handling — set up once on DOMContentLoaded
     document.addEventListener('DOMContentLoaded', () => {
       const chatInput = document.getElementById('chat-input');
-      if (chatInput) {
-        chatInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter' && chatInput.value.trim()) {
-            socket.emit('send-chat-message', { message: chatInput.value });
+      if (!chatInput) return;
+
+      chatInput.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // prevent WASD/arrows from moving player while typing
+        if (e.key === 'Enter') {
+          const msg = chatInput.value.trim();
+          if (msg && socket) {
+            socket.emit('send-chat-message', { message: msg });
             chatInput.value = '';
           }
-        });
+          closeChat();
+        }
+        if (e.key === 'Escape') {
+          chatInput.value = '';
+          closeChat();
+        }
+      });
+    });
+
+    // Press Enter during gameplay to open chat
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && window._gameActive && !_chatOpen) {
+        e.preventDefault();
+        openChat();
       }
     });
 
@@ -3887,6 +3896,10 @@
       // Clear keys and activate input
       window._pixelioKeys = {};
       window._gameActive  = true;
+
+      // Show chat overlay
+      const chat = document.getElementById('game-chat');
+      if (chat) { chat.style.display = 'none'; _chatOpen = false; }
 
       // Destroy any old 3D instance
       if (game3D) { game3D.destroy(); game3D = null; }

@@ -64,7 +64,7 @@ const MAPS = {
     name: 'Brain Island',
     size: 5000,  // EVEN BIGGER MAP for more POIs!
     playerSize: 30,
-    theme: 'fortnite',
+    theme: 'pixelio',
     triviaStations: 30,
     powerupSpawns: 45,
     weaponSpawns: 60,
@@ -486,16 +486,14 @@ io.on('connection', (socket) => {
     const game = games.get(gameId);
     if (!game) return;
     
-    // Check if user has chat enabled
+    // Profanity filter — always on for everyone, school friendly
+    data.message = filterProfanity(data.message);
+
+    // Check if registered user has chat enabled
     if (!socket.isGuest) {
       try {
         const user = await User.findById(socket.userId);
         if (!user.settings.chatEnabled) return;
-        
-        // Basic profanity filter if enabled
-        if (user.settings.profanityFilter) {
-          data.message = filterProfanity(data.message);
-        }
       } catch (error) {
         console.error('Chat settings check error:', error);
       }
@@ -2273,10 +2271,24 @@ function generateChestWeapon(quality) {
 }
 
 function filterProfanity(text) {
-  const badWords = ['damn', 'hell', 'crap', 'stupid']; // Add more as needed
+  const badWords = [
+    // Profanity
+    'fuck','shit','ass','bitch','bastard','damn','hell','crap',
+    'piss','dick','cock','pussy','cunt','whore','slut','fag',
+    'nigger','nigga','retard','spastic',
+    // Violence/threats
+    'kill yourself','kys','die','murder','rape','molest',
+    // Slurs / hate
+    'faggot','dyke','tranny','chink','spic','kike','wetback',
+    // Common bypasses (leet speak)
+    'fvck','sh1t','b1tch','a55','f4g',
+  ];
+
   let filtered = text;
   badWords.forEach(word => {
-    const regex = new RegExp(word, 'gi');
+    // Match whole word or phrase, case-insensitive
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'gi');
     filtered = filtered.replace(regex, '*'.repeat(word.length));
   });
   return filtered;
@@ -2286,12 +2298,12 @@ function filterProfanity(text) {
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log(`
-  ╔════════════════════════════════════════╗
-  ║  🧠 BrainStorm Royale Server Running  ║
-  ╠════════════════════════════════════════╣
-  ║  Port: ${PORT}                           ║
-  ║  Database: Connected                   ║
-  ║  Status: ✅ Ready                       ║
-  ╚════════════════════════════════════════╝
+  ╔════════════════════════════════════╗
+  ║    🎮 Pixelio Server Running       ║
+  ╠════════════════════════════════════╣
+  ║  Port: ${PORT}                         ║
+  ║  Database: Connected               ║
+  ║  Status: ✅ Ready                   ║
+  ╚════════════════════════════════════╝
   `);
 });
