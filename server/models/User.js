@@ -167,6 +167,13 @@ const UserSchema = new mongoose.Schema({
     highContrast: { type: Boolean, default: false }
   },
   
+  // Profile customization
+  profile: {
+    bio: { type: String, default: '', maxlength: 150 },
+    profilePic: { type: String, default: 'default' },
+    ownedProfilePics: { type: [String], default: ['default'] }
+  },
+
   // Admin & Moderation
   isAdmin: { type: Boolean, default: false },
   isBanned: { type: Boolean, default: false },

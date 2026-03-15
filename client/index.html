@@ -1280,6 +1280,7 @@
     <div class="top-bar">
       <div class="top-bar-left">
         <button class="top-button" onclick="openSettings()">⚙️ Settings</button>
+        <button class="top-button" onclick="openProfile()">👤 Profile</button>
         <button class="top-button" onclick="toggleFriends()">
           👥 Friends
           <span id="friend-requests-badge" class="notification-badge">0</span>
@@ -2554,7 +2555,7 @@
         item.className = 'friend-item';
         item.innerHTML = `
           <div class="friend-info">
-            <div class="friend-name">
+            <div class="friend-name" onclick="openProfile('${friend.username}')" style="cursor:pointer;" title="View profile">
               <span class="${friend.isOnline ? 'online' : 'offline'}-indicator"></span>
               ${friend.username}
             </div>
@@ -2916,7 +2917,7 @@
       if (!chat || !input) return;
       chat.style.display = 'flex';
       _chatOpen = true;
-      // Pause movement while typing
+      window._chatOpen = true;
       window._pixelioKeys = {};
       setTimeout(() => input.focus(), 10);
     }
@@ -2927,7 +2928,8 @@
       if (!chat) return;
       chat.style.display = 'none';
       _chatOpen = false;
-      input.blur();
+      window._chatOpen = false;
+      if (input) input.blur();
     }
 
     function addChatMessage(msg) {
@@ -2982,7 +2984,7 @@
 
     // Press Enter during gameplay to open chat
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && window._gameActive && !_chatOpen) {
+      if (e.key === 'Enter' && window._gameActive && !window._chatOpen) {
         e.preventDefault();
         openChat();
       }
@@ -6015,8 +6017,222 @@
     
     
     
+    // ========== PROFILE SYSTEM ==========
+    let _profileIsOwn = false;
+
+    const BADGE_DEFS = [
+      { id: 'first_win',      emoji: '🏆', label: 'First Win'         },
+      { id: 'ten_wins',       emoji: '🥇', label: '10 Wins'           },
+      { id: 'fifty_wins',     emoji: '👑', label: '50 Wins'           },
+      { id: 'sharpshooter',   emoji: '🎯', label: 'Sharpshooter'      },
+      { id: 'survivor',       emoji: '🛡️', label: 'Survivor'          },
+      { id: 'social',         emoji: '🤝', label: 'Social Butterfly'  },
+      { id: 'early_adopter',  emoji: '⭐', label: 'Early Adopter'     },
+      { id: 'hundred_games',  emoji: '🎮', label: '100 Games Played'  },
+    ];
+
+    async function openProfile(username) {
+      const modal = document.getElementById('profile-modal');
+      modal.style.display = 'block';
+
+      // If no username passed, show own profile
+      const targetUser = username || currentUser?.username;
+      if (!targetUser) return;
+      _profileIsOwn = !username || username === currentUser?.username;
+
+      try {
+        const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+        const res = await fetch(`/api/auth/profile/${encodeURIComponent(targetUser)}`, { headers });
+        if (!res.ok) { modal.style.display = 'none'; alert('Player not found'); return; }
+        const data = await res.json();
+        renderProfile(data);
+      } catch (e) {
+        console.error('Profile load error:', e);
+      }
+    }
+
+    function closeProfile() {
+      document.getElementById('profile-modal').style.display = 'none';
+    }
+
+    function renderProfile(data) {
+      // Name + join date
+      document.getElementById('profile-username').textContent = data.username;
+      const joined = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { year:'numeric', month:'long' }) : '';
+      document.getElementById('profile-joindate').textContent = joined ? `Joined ${joined}` : '';
+
+      // Bio
+      const bio = data.profile?.bio || '';
+      document.getElementById('profile-bio-display').textContent = bio || (_profileIsOwn ? 'No bio yet — add one!' : 'No bio set.');
+      document.getElementById('profile-bio-edit').style.display = 'none';
+      document.getElementById('edit-bio-btn').style.display = _profileIsOwn ? 'inline-block' : 'none';
+
+      // Profile pic
+      const picEmojis = { default:'🤖', pug:'🐶', star:'⭐', crown:'👑', fire:'🔥', lightning:'⚡', crystal:'💎', galaxy:'🌌' };
+      const picId = data.profile?.profilePic || 'default';
+      document.getElementById('profile-pic-display').textContent = picEmojis[picId] || '🤖';
+
+      // Stats
+      document.getElementById('profile-wins').textContent  = data.stats?.wins ?? 0;
+      document.getElementById('profile-kd').textContent    = data.kdRatio ?? '0.00';
+      document.getElementById('profile-games').textContent = data.stats?.gamesPlayed ?? 0;
+      document.getElementById('profile-kills').textContent = data.stats?.kills ?? 0;
+      document.getElementById('profile-coins').textContent = (data.stats?.coins ?? 0).toLocaleString();
+
+      // Battle Ticket
+      document.getElementById('profile-bt').textContent        = `Tier ${data.battleTicket?.tier ?? 0}`;
+      document.getElementById('profile-bt-season').textContent = data.battleTicket?.season ?? 1;
+
+      // Skin preview
+      const skinCanvas = document.getElementById('profile-skin-preview');
+      const skinId = data.inventory?.equippedSkin || 'default';
+      const skinColors = { default:0x8899cc, pink:0xFF69B4, gold:0xFFD700, shadow:0x444466, galaxy:0x9370DB, cyber:0x00FFFF, flame:0xFF4500, ocean:0x1E90FF };
+      document.getElementById('profile-skin-name').textContent = CharacterRenderer.skins[skinId]?.name || 'Default';
+      if (typeof window.renderModelPreview === 'function') {
+        window.renderModelPreview(skinCanvas, skinId, skinColors);
+      }
+
+      // Badges
+      const badgeContainer = document.getElementById('profile-badges');
+      const earned = (data.achievements || []).map(a => a.id);
+      // Auto-generate some badges from stats
+      const autoEarned = [];
+      if ((data.stats?.wins ?? 0) >= 1)   autoEarned.push('first_win');
+      if ((data.stats?.wins ?? 0) >= 10)  autoEarned.push('ten_wins');
+      if ((data.stats?.wins ?? 0) >= 50)  autoEarned.push('fifty_wins');
+      if ((data.stats?.gamesPlayed ?? 0) >= 100) autoEarned.push('hundred_games');
+      if (data.createdAt && new Date(data.createdAt) < new Date('2026-06-01')) autoEarned.push('early_adopter');
+      const allEarned = [...new Set([...earned, ...autoEarned])];
+
+      if (allEarned.length === 0) {
+        badgeContainer.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:13px;">No badges yet — keep playing!</div>';
+      } else {
+        badgeContainer.innerHTML = allEarned.map(id => {
+          const def = BADGE_DEFS.find(b => b.id === id);
+          if (!def) return '';
+          return `<div title="${def.label}" style="background:rgba(255,255,255,0.1);border-radius:8px;padding:8px 12px;font-size:20px;cursor:default;" title="${def.label}">${def.emoji} <span style="font-size:12px;vertical-align:middle;color:rgba(255,255,255,0.8);">${def.label}</span></div>`;
+        }).join('');
+      }
+    }
+
+    function startBioEdit() {
+      const bio = document.getElementById('profile-bio-display').textContent;
+      document.getElementById('profile-bio-input').value = bio === 'No bio yet — add one!' ? '' : bio;
+      document.getElementById('profile-bio-display').style.display = 'none';
+      document.getElementById('edit-bio-btn').style.display = 'none';
+      document.getElementById('profile-bio-edit').style.display = 'block';
+    }
+
+    function cancelBioEdit() {
+      document.getElementById('profile-bio-edit').style.display = 'none';
+      document.getElementById('profile-bio-display').style.display = 'block';
+      document.getElementById('edit-bio-btn').style.display = 'inline-block';
+    }
+
+    async function saveBio() {
+      const bio = document.getElementById('profile-bio-input').value.trim();
+      try {
+        const res = await fetch('/api/auth/profile/customise', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ bio })
+        });
+        if (res.ok) {
+          document.getElementById('profile-bio-display').textContent = bio || 'No bio yet — add one!';
+          cancelBioEdit();
+        }
+      } catch(e) { console.error('Bio save error:', e); }
+    }
+
     
   </script>
+
+  <!-- ===== PROFILE MODAL ===== -->
+  <div id="profile-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:999998; overflow-y:auto; font-family:inherit;">
+    <div style="max-width:680px; margin:40px auto; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%); border-radius:20px; padding:32px; color:white; position:relative;">
+      
+      <!-- Close -->
+      <button onclick="closeProfile()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:rgba(255,255,255,0.6);font-size:28px;cursor:pointer;line-height:1;">×</button>
+
+      <!-- Header row: pic + name + bio -->
+      <div style="display:flex; gap:24px; align-items:flex-start; margin-bottom:28px;">
+        <div style="position:relative; flex-shrink:0;">
+          <div id="profile-pic-display" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:36px;border:3px solid rgba(255,255,255,0.2);">🤖</div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div id="profile-username" style="font-size:26px;font-weight:bold;margin-bottom:4px;"></div>
+          <div id="profile-joindate" style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:10px;"></div>
+          <!-- Bio — editable for own profile -->
+          <div id="profile-bio-display" style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;"></div>
+          <div id="profile-bio-edit" style="display:none;">
+            <textarea id="profile-bio-input" maxlength="150" rows="2"
+              style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:white;padding:8px;font-size:14px;resize:none;font-family:inherit;box-sizing:border-box;"></textarea>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <button onclick="saveBio()" style="padding:6px 16px;background:#667eea;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">Save</button>
+              <button onclick="cancelBioEdit()" style="padding:6px 16px;background:rgba(255,255,255,0.1);border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">Cancel</button>
+            </div>
+          </div>
+          <button id="edit-bio-btn" onclick="startBioEdit()" style="display:none;margin-top:6px;padding:5px 12px;background:rgba(255,255,255,0.1);border:none;border-radius:6px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:12px;">✏️ Edit Bio</button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:14px;text-align:center;">
+          <div id="profile-wins" style="font-size:24px;font-weight:bold;color:#FFD700;">0</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;">Wins</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:14px;text-align:center;">
+          <div id="profile-kd" style="font-size:24px;font-weight:bold;color:#a5b4fc;">0.00</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;">K/D</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:14px;text-align:center;">
+          <div id="profile-games" style="font-size:24px;font-weight:bold;color:#34d399;">0</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;">Games</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:14px;text-align:center;">
+          <div id="profile-kills" style="font-size:24px;font-weight:bold;color:#f87171;">0</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;">Kills</div>
+        </div>
+      </div>
+
+      <!-- Coins + Battle Ticket row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">🪙</span>
+          <div>
+            <div id="profile-coins" style="font-size:20px;font-weight:bold;">0</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);">Coins</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">🎫</span>
+          <div>
+            <div id="profile-bt" style="font-size:20px;font-weight:bold;">Tier 0</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);">Season <span id="profile-bt-season">1</span> Battle Ticket</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equipped skin preview -->
+      <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:16px;margin-bottom:24px;display:flex;align-items:center;gap:16px;">
+        <canvas id="profile-skin-preview" width="80" height="100" style="border-radius:10px;background:rgba(255,255,255,0.05);flex-shrink:0;"></canvas>
+        <div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:4px;">Equipped Skin</div>
+          <div id="profile-skin-name" style="font-size:18px;font-weight:bold;">Default</div>
+        </div>
+      </div>
+
+      <!-- Achievements -->
+      <div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:16px;">
+        <div style="font-size:15px;font-weight:bold;margin-bottom:12px;">🏅 Badges</div>
+        <div id="profile-badges" style="display:flex;flex-wrap:wrap;gap:8px;">
+          <div style="color:rgba(255,255,255,0.4);font-size:13px;">No badges yet — keep playing!</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
 </body>
 </html>

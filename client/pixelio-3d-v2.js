@@ -247,7 +247,7 @@ class Pixelio3D {
       let diff = targetFacing - this._localFacing;
       if (diff > Math.PI)  diff -= Math.PI * 2;
       if (diff < -Math.PI) diff += Math.PI * 2;
-      this._localFacing += diff * 0.25;
+      this._localFacing += diff * 0.4; // snappier turning
     }
 
     const me = this.players.get(this.myPlayerId);

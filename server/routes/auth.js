@@ -123,12 +123,14 @@ router.get('/profile', authenticate, async (req, res) => {
       stats: user.stats,
       inventory: user.inventory,
       achievements: user.achievements,
-      matchHistory: user.matchHistory.slice(0, 10), // Last 10 games
+      matchHistory: user.matchHistory.slice(0, 10),
       kdRatio: user.kdRatio,
       winRate: user.winRate,
       accuracy: user.accuracy,
       createdAt: user.createdAt,
-      lastLogin: user.lastLogin
+      lastLogin: user.lastLogin,
+      battleTicket: user.battleTicket,
+      profile: user.profile || { bio: '', profilePic: 'default', ownedProfilePics: ['default'] }
     });
   } catch (error) {
     console.error('Profile error:', error);
@@ -268,3 +270,49 @@ router.post('/logout', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+
+// ========== GET PUBLIC PROFILE BY USERNAME ==========
+router.get('/profile/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username });
+    if (!user) return res.status(404).json({ error: 'Player not found' });
+
+    // Only return public info
+    res.json({
+      username:    user.username,
+      createdAt:   user.createdAt,
+      stats:       user.stats,
+      kdRatio:     user.kdRatio,
+      winRate:     user.winRate,
+      inventory:   { equippedSkin: user.inventory.equippedSkin },
+      battleTicket:{ tier: user.battleTicket.tier, season: user.battleTicket.season, hasPremium: user.battleTicket.hasPremium },
+      achievements: user.achievements,
+      profile:     user.profile || { bio: '', profilePic: 'default' }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching profile' });
+  }
+});
+
+// ========== UPDATE BIO + PROFILE PIC ==========
+router.patch('/profile/customise', authenticate, async (req, res) => {
+  try {
+    const { bio, profilePic } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (bio !== undefined) {
+      user.profile = user.profile || {};
+      user.profile.bio = String(bio).substring(0, 150);
+    }
+    if (profilePic !== undefined) {
+      const owned = user.profile?.ownedProfilePics || ['default'];
+      if (owned.includes(profilePic)) {
+        user.profile.profilePic = profilePic;
+      }
+    }
+    await user.save();
+    res.json({ message: 'Profile updated', profile: user.profile });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating profile' });
+  }
+});
