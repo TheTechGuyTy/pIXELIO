@@ -1297,7 +1297,7 @@
     <!-- Main Menu -->
     <div class="menu-container">
       <h1 class="game-title">Pixelio</h1>
-      <p class="game-subtitle">⚡ Battle Royale meets Trivia ⚡</p>
+      <p class="game-subtitle">⚡ Last Pixel Standing ⚡</p>
 
       <div id="user-info" class="user-info">
         <h3 id="username-display"></h3>
@@ -1384,7 +1384,7 @@
     <div class="modal-content" style="max-width: 800px;">
       <button class="modal-close" onclick="closeBattleTicket()">×</button>
       <div class="battle-ticket-header">
-        <div class="season-title" id="season-name">Season 1: Brain Storm Rising</div>
+        <div class="season-title" id="season-name">Season 1: Glitch Rising</div>
         <div class="tier-display">Tier <span id="current-tier">0</span> / <span id="max-tier">50</span></div>
         <div class="xp-progress">
           <div class="xp-bar" id="xp-bar" style="width: 0%"></div>
@@ -1958,7 +1958,7 @@
     <canvas id="studio-canvas" style="position: fixed; left: 250px; top: 60px; right: 300px; bottom: 0;"></canvas>
   </div>
   
-  <!-- LOCKER (Like Fortnite) -->
+  <!-- LOCKER -->
   <div id="character-customizer" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 999997; overflow-y: auto;">
     <div style="max-width: 1400px; margin: 0 auto; padding: 40px 20px;">
       <!-- Header -->
@@ -2284,6 +2284,38 @@
       });
       
       setupGameHandlers();
+    }
+
+    function showWinScreen(winner) {
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;color:white;font-family:inherit;`;
+      el.innerHTML = `
+        <div style="font-size:64px;margin-bottom:10px;">🏆</div>
+        <div style="font-size:42px;font-weight:bold;color:#FFD700;margin-bottom:8px;">You Win!</div>
+        <div style="font-size:20px;opacity:0.8;margin-bottom:40px;">${winner} is the Last Pixel Standing</div>
+        <button onclick="this.parentElement.remove();showMenuScreen();"
+          style="padding:14px 40px;font-size:18px;font-weight:bold;border:none;border-radius:12px;
+          background:linear-gradient(135deg,#667eea,#764ba2);color:white;cursor:pointer;">
+          Back to Menu
+        </button>`;
+      document.body.appendChild(el);
+    }
+
+    function showEliminatedScreen(killerName) {
+      const el = document.createElement('div');
+      el.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;color:white;font-family:inherit;`;
+      el.innerHTML = `
+        <div style="font-size:64px;margin-bottom:10px;">💀</div>
+        <div style="font-size:42px;font-weight:bold;color:#ef4444;margin-bottom:8px;">Eliminated!</div>
+        <div style="font-size:20px;opacity:0.8;margin-bottom:40px;">Taken out by <strong>${killerName}</strong></div>
+        <button onclick="this.parentElement.remove();showMenuScreen();"
+          style="padding:14px 40px;font-size:18px;font-weight:bold;border:none;border-radius:12px;
+          background:linear-gradient(135deg,#ef4444,#b91c1c);color:white;cursor:pointer;">
+          Back to Menu
+        </button>`;
+      document.body.appendChild(el);
     }
 
     function showMenuScreen() {
@@ -4973,7 +5005,7 @@
         document.getElementById('game-screen').style.display = 'none';
         
         // Return to menu - force visible
-        alert(`💀 You were eliminated! Killed by: ${data.killerName}`);
+        showEliminatedScreen(data.killerName);
         showMenuScreen();
         document.getElementById('menu-screen').style.zIndex = '9999';
       });
@@ -4990,7 +5022,7 @@
         document.getElementById('game-screen').style.display = 'none';
         
         // Show winner screen
-        alert(`🎉 Game Over! Winner: ${data.winner}`);
+        showWinScreen(data.winner);
         
         // Return to menu - force it visible above everything
         showMenuScreen();

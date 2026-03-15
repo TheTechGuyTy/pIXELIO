@@ -91,8 +91,8 @@ class Pixelio3D {
 
   _init() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87CEEB);
-    this.scene.fog = new THREE.Fog(0x87CEEB, 2000, 9000);
+    this.scene.background = new THREE.Color(0x6aabdb);  // Pixelio blue sky
+    this.scene.fog = new THREE.FogExp2(0x8ec8e8, 0.00018); // exponential fog, softer
 
     // Camera starts behind — will be repositioned every frame
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 12000);
@@ -106,32 +106,55 @@ class Pixelio3D {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lighting
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff4d0, 1.1);
-    sun.position.set(300, 500, 300);
+    // === LIGHTING — three-point setup for depth ===
+    // Soft ambient — no harsh shadows in flat areas
+    this.scene.add(new THREE.AmbientLight(0xd4e8ff, 0.5));
+
+    // Main sun — warm, angled to cast long shadows
+    const sun = new THREE.DirectionalLight(0xffe8b0, 1.3);
+    sun.position.set(400, 600, 200);
     sun.castShadow = true;
     sun.shadow.mapSize.setScalar(2048);
-    sun.shadow.camera.left = sun.shadow.camera.bottom = -600;
-    sun.shadow.camera.right = sun.shadow.camera.top = 600;
-    sun.shadow.camera.far = 2000;
+    sun.shadow.camera.left = sun.shadow.camera.bottom = -700;
+    sun.shadow.camera.right = sun.shadow.camera.top = 700;
+    sun.shadow.camera.far = 2500;
+    sun.shadow.bias = -0.001;
     this.scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xadd8ff, 0.35);
-    fill.position.set(-300, 200, -300);
+
+    // Fill light from opposite side — blue-tinted sky bounce
+    const fill = new THREE.DirectionalLight(0x8ab4f8, 0.4);
+    fill.position.set(-300, 200, -400);
     this.scene.add(fill);
 
-    // Ground
+    // Rim light from behind — gives models a slight glow outline
+    const rim = new THREE.DirectionalLight(0xffd6a0, 0.25);
+    rim.position.set(0, 100, -600);
+    this.scene.add(rim);
+
+    // === GROUND — layered for visual interest ===
+    // Base grass layer
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(8000, 8000),
-      new THREE.MeshLambertMaterial({ color: 0x5a8a3c })
+      new THREE.MeshLambertMaterial({ color: 0x4a7c3f })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    const grid = new THREE.GridHelper(8000, 80, 0x000000, 0x2d5c1a);
-    grid.material.opacity = 0.12;
+    // Dirt path cross through center
+    const pathMat = new THREE.MeshLambertMaterial({ color: 0x8b6914 });
+    [[8000,80,0,0], [80,8000,0,0]].forEach(([w,h,x,z]) => {
+      const path = new THREE.Mesh(new THREE.PlaneGeometry(w, h), pathMat);
+      path.rotation.x = -Math.PI / 2;
+      path.position.set(x, 0.2, z);
+      this.scene.add(path);
+    });
+
+    // Subtle grid just on the dirt paths
+    const grid = new THREE.GridHelper(8000, 60, 0x000000, 0x3a5a2a);
+    grid.material.opacity = 0.08;
     grid.material.transparent = true;
     this.scene.add(grid);
 
@@ -314,19 +337,82 @@ class Pixelio3D {
   }
 
   createBuildings(buildings, mapSize) {
-    const half   = mapSize / 2;
-    const colors = [0x9e8c6b, 0x7a8fa0, 0xb0724e, 0x6e7a6e, 0xc0a882];
+    const half = mapSize / 2;
+
+    // Wall palettes — warm/cool/neutral mixes
+    const wallColors = [
+      0xd4a96a, 0xc8b89a, 0x8fa8b8, 0xb8c4a0,
+      0xe8c89a, 0xa89878, 0x7898a8, 0xc0a870,
+      0x9ab0c8, 0xb8d0a8, 0xe0c0a0, 0xa0b8d0
+    ];
+    const roofColors = [
+      0x7a4030, 0x506070, 0x405840, 0x604830,
+      0x384858, 0x583828, 0x486058, 0x703830
+    ];
+    const windowColor = 0xc8e8ff;
+
     buildings.forEach((b, i) => {
       const h = b.height || 60;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(b.width || 80, h, b.depth || 80),
-        new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
-      );
-      mesh.position.set(b.x - half, h / 2, b.y - half);
-      mesh.castShadow = mesh.receiveShadow = true;
-      this.scene.add(mesh);
-      this.buildings.push(mesh);
+      const w = b.width  || 80;
+      const d = b.depth  || 80;
+      const wx = b.x - half;
+      const wz = b.y - half;
+
+      const wallMat = new THREE.MeshLambertMaterial({ color: wallColors[i % wallColors.length] });
+      const roofMat = new THREE.MeshLambertMaterial({ color: roofColors[i % roofColors.length] });
+      const winMat  = new THREE.MeshLambertMaterial({ color: windowColor, emissive: 0x446688, emissiveIntensity: 0.3 });
+
+      // Main building body
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+      body.position.set(wx, h / 2, wz);
+      body.castShadow = body.receiveShadow = true;
+      this.scene.add(body);
+
+      // Flat roof slab (slightly wider for overhang)
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 6, 6, d + 6), roofMat);
+      roof.position.set(wx, h + 3, wz);
+      roof.castShadow = true;
+      this.scene.add(roof);
+
+      // Rooftop detail — small box on larger buildings
+      if (h > 60) {
+        const detail = new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 12, d * 0.3), roofMat);
+        detail.position.set(wx, h + 12, wz);
+        this.scene.add(detail);
+      }
+
+      // Windows — add a row of windows on each face for taller buildings
+      if (h > 40) {
+        const floors = Math.floor(h / 40);
+        const winSize = 10;
+        for (let floor = 0; floor < floors; floor++) {
+          const wy = 25 + floor * 38;
+          // Front and back faces
+          [-1, 1].forEach(side => {
+            const winsPerSide = Math.max(1, Math.floor(w / 35));
+            for (let wi = 0; wi < winsPerSide; wi++) {
+              const wx2 = wx - (w / 2) + (w / (winsPerSide + 1)) * (wi + 1);
+              const win = new THREE.Mesh(new THREE.BoxGeometry(winSize, winSize * 1.4, 2), winMat);
+              win.position.set(wx2, wy, wz + side * (d / 2 + 1));
+              this.scene.add(win);
+            }
+          });
+          // Side faces
+          [-1, 1].forEach(side => {
+            const winsPerSide = Math.max(1, Math.floor(d / 35));
+            for (let wi = 0; wi < winsPerSide; wi++) {
+              const wz2 = wz - (d / 2) + (d / (winsPerSide + 1)) * (wi + 1);
+              const win = new THREE.Mesh(new THREE.BoxGeometry(2, winSize * 1.4, winSize), winMat);
+              win.position.set(wx + side * (w / 2 + 1), wy, wz2);
+              this.scene.add(win);
+            }
+          });
+        }
+      }
+
+      this.buildings.push(body);
     });
+
     console.log(`🏗️ ${buildings.length} buildings created`);
   }
 

@@ -61,7 +61,7 @@ app.get('/api/health', (req, res) => {
 // ============== GAME CONSTANTS ==============
 const MAPS = {
   classic: {
-    name: 'Brain Island',
+    name: 'Pixelio Island',
     size: 5000,  // EVEN BIGGER MAP for more POIs!
     playerSize: 30,
     theme: 'pixelio',
@@ -69,9 +69,9 @@ const MAPS = {
     powerupSpawns: 45,
     weaponSpawns: 60,
     buildings: 150, // WAY more buildings!
-    pois: [ // 12 FORTNITE-STYLE LOCATIONS!
+    pois: [
       { 
-        name: '🏙️ Brainy Burbs', // Like Tilted Towers!
+        name: '🏙️ Pixel City',
         x: 2500, 
         y: 2500, 
         size: 600, 
@@ -91,7 +91,7 @@ const MAPS = {
         description: 'Medieval castle with towers'
       },
       { 
-        name: '🏬 Memory Mall', // Like Retail Row!
+        name: '🏬 Neon Mall',
         x: 3800, 
         y: 3500, 
         size: 550, 
@@ -101,7 +101,7 @@ const MAPS = {
         description: 'Shopping district with stores'
       },
       { 
-        name: '🏡 Pleasant Plaza', // Like Pleasant Park!
+        name: '🏡 Cozy Corners',
         x: 800, 
         y: 1200, 
         size: 500, 
@@ -121,7 +121,7 @@ const MAPS = {
         description: 'Forest cabins and campsites'
       },
       { 
-        name: '⚔️ Think Tank', // Like Military base!
+        name: '⚔️ Grid Fortress',
         x: 600, 
         y: 600, 
         size: 400, 
@@ -131,7 +131,7 @@ const MAPS = {
         description: 'Military compound'
       },
       { 
-        name: '🏖️ Salty Shores', // Like Salty Springs!
+        name: '🏖️ Pixel Beach',
         x: 4200, 
         y: 4400, 
         size: 350, 
@@ -141,7 +141,7 @@ const MAPS = {
         description: 'Coastal town'
       },
       { 
-        name: '🏭 Factory Frenzy', // Like Steamy Stacks!
+        name: '🏭 Circuit Works',
         x: 1800, 
         y: 800, 
         size: 500, 
@@ -193,7 +193,7 @@ const MAPS = {
     ]
   },
   mega: {
-    name: 'Mega City',
+    name: 'Neon City',
     size: 5000,
     playerSize: 30,
     theme: 'urban',
@@ -203,7 +203,7 @@ const MAPS = {
     buildings: 60
   },
   desert: {
-    name: 'Desert Storm',
+    name: 'Dust Flats',
     size: 4500,
     playerSize: 30,
     theme: 'desert',
@@ -213,7 +213,7 @@ const MAPS = {
     buildings: 30
   },
   island: {
-    name: 'Brain Island',
+    name: 'Pixelio Island',
     size: 6000,
     playerSize: 30,
     theme: 'island',
@@ -1604,9 +1604,9 @@ function startGameLoop(gameId) {
           player.health = 0;
           
           game.killFeed.unshift({
-            killer: 'Storm',
+            killer: 'Glitch Zone',
             victim: player.username,
-            weapon: 'storm',
+            weapon: 'glitch_zone',
             timestamp: Date.now()
           });
         }
