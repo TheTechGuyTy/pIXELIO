@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { authenticate } = require('../middleware/auth');
 
+// Keep in sync with server/index.js ADMIN_USERNAMES
+const ADMIN_USERNAMES = ['jmanskills'];
 const router = express.Router();
 
 // Generate JWT token
@@ -85,7 +87,13 @@ router.post('/login', async (req, res) => {
     
     // Update last login
     user.lastLogin = new Date();
-    user.isOnline = true;
+    user.isOnline  = true;
+
+    // Auto-grant admin if username is in the hardcoded list
+    if (!user.isAdmin && ADMIN_USERNAMES.map(u => u.toLowerCase()).includes(user.username.toLowerCase())) {
+      user.isAdmin = true;
+    }
+
     await user.save();
     
     // Generate token
@@ -100,6 +108,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         stats: user.stats,
         inventory: user.inventory,
+        isAdmin: user.isAdmin,
         kdRatio: user.kdRatio,
         winRate: user.winRate,
         accuracy: user.accuracy

@@ -520,3 +520,51 @@ function renderModelPreview(canvas, skinId, skinColors) {
 }
 
 window.renderModelPreview = renderModelPreview;
+
+// ============ FBX MODEL LOADER ============
+// Loads /playermodel.fbx when Three.js FBXLoader is available.
+// Until the model is rigged, falls back to buildPixelioCharacter().
+// To enable: include FBXLoader.js before pixelio-3d-v2.js
+
+window._fbxModelCache = null;  // cached loaded FBX scene
+window._fbxLoading    = false;
+
+function loadFBXModel(onLoaded) {
+  if (window._fbxModelCache) { onLoaded(window._fbxModelCache.clone()); return; }
+  if (window._fbxLoading)    { setTimeout(() => loadFBXModel(onLoaded), 200); return; }
+  if (typeof THREE.FBXLoader === 'undefined') {
+    console.warn('FBXLoader not available — using procedural model');
+    onLoaded(null); return;
+  }
+
+  window._fbxLoading = true;
+  const loader = new THREE.FBXLoader();
+  loader.load('/playermodel.fbx',
+    (fbx) => {
+      console.log('✅ FBX loaded!');
+      // Normalize scale from Blender export
+      fbx.scale.setScalar(0.15);
+      fbx.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow    = true;
+          child.receiveShadow = true;
+        }
+      });
+      window._fbxModelCache = fbx;
+      window._fbxLoading    = false;
+      onLoaded(fbx.clone());
+    },
+    undefined,
+    (err) => {
+      console.warn('FBX load failed, using procedural model:', err.message);
+      window._fbxLoading = false;
+      onLoaded(null);
+    }
+  );
+}
+
+// Call this once your rigged FBX is ready to swap in
+window.enableFBXModel = function() {
+  window._fbxModelCache = null; // clear cache to force reload
+  console.log('FBX model enabled — will load on next spawn');
+};
