@@ -130,6 +130,7 @@ router.get('/profile', authenticate, async (req, res) => {
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
       battleTicket: user.battleTicket,
+      settings: user.settings,
       profile: user.profile || { bio: '', profilePic: 'default', ownedProfilePics: ['default'] }
     });
   } catch (error) {
@@ -141,23 +142,29 @@ router.get('/profile', authenticate, async (req, res) => {
 // ========== UPDATE PROFILE ==========
 router.patch('/profile', authenticate, async (req, res) => {
   try {
-    const { equippedSkin, equippedTrail } = req.body;
+    const { equippedSkin, equippedTrail, settings } = req.body;
     const user = await User.findById(req.userId);
-    
+
     // Update equipped cosmetics
     if (equippedSkin && user.inventory.ownedSkins.includes(equippedSkin)) {
       user.inventory.equippedSkin = equippedSkin;
     }
-    
     if (equippedTrail && user.inventory.ownedTrails.includes(equippedTrail)) {
       user.inventory.equippedTrail = equippedTrail;
     }
-    
+
+    // Save settings — merge so partial updates work
+    if (settings && typeof settings === 'object') {
+      user.settings = { ...user.settings.toObject?.() ?? user.settings, ...settings };
+      user.markModified('settings');
+    }
+
     await user.save();
-    
+
     res.json({
       message: 'Profile updated',
-      inventory: user.inventory
+      inventory: user.inventory,
+      settings: user.settings
     });
   } catch (error) {
     console.error('Update profile error:', error);

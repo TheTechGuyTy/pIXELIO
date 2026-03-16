@@ -3316,30 +3316,24 @@
     
     // ========== SAVE SETTINGS ==========
     async function saveSettings() {
+      collectSettingsFromUI();
       try {
         if (isGuest) {
-          // Save to localStorage for guests
           localStorage.setItem('guestSettings', JSON.stringify(currentSettings));
-          alert('✅ Settings saved locally!');
+          applySettings();
           closeSettings();
+          showSettingsSaved();
           return;
         }
-        
         const res = await fetch('/api/auth/profile', {
           method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ settings: currentSettings })
         });
-        
         if (res.ok) {
-          alert('✅ Settings saved!');
-          closeSettings();
-          
-          // Apply settings immediately
           applySettings();
+          closeSettings();
+          showSettingsSaved();
         } else {
           alert('❌ Failed to save settings');
         }
@@ -3347,6 +3341,54 @@
         console.error('Save settings error:', error);
         alert('❌ Error saving settings');
       }
+    }
+
+    function showSettingsSaved() {
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#22c55e;color:white;padding:12px 28px;border-radius:10px;font-weight:bold;font-size:15px;z-index:9999999;';
+      toast.textContent = '✅ Settings saved!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    function collectSettingsFromUI() {
+      const sliderMap = {
+        'master-volume-slider': ['masterVolume', true],
+        'music-volume-slider':  ['musicVolume',  true],
+        'sfx-volume-slider':    ['sfxVolume',    true],
+        'voice-volume-slider':  ['voiceVolume',  true],
+        'mic-sensitivity-slider': ['micSensitivity', true],
+        'sensitivity-slider':   ['mouseSensitivity', false],
+      };
+      Object.entries(sliderMap).forEach(([id, [key, divHundred]]) => {
+        const el = document.getElementById(id);
+        if (el) currentSettings[key] = divHundred ? parseFloat(el.value) / 100 : parseFloat(el.value);
+      });
+
+      const toggleMap = {
+        'voice-enabled-toggle':'voiceChatEnabled','push-to-talk-toggle':'pushToTalk',
+        'voice-activation-toggle':'voiceActivation','sfx-toggle':'soundEffects',
+        'music-toggle':'music','fps-toggle':'showFPS','ping-toggle':'showPing',
+        'motion-blur-toggle':'motionBlur','auto-pickup-toggle':'autoPickup',
+        'auto-switch-toggle':'autoSwitchWeapon','damage-numbers-toggle':'showDamageNumbers',
+        'kill-feed-toggle':'showKillFeed','online-toggle':'showOnlineStatus',
+        'friend-requests-toggle':'friendRequestsEnabled','spectators-toggle':'allowSpectators',
+        'share-stats-toggle':'shareStats','chat-toggle':'chatEnabled',
+        'profanity-toggle':'profanityFilter','simple-build-toggle':'simpleBuildMode',
+      };
+      Object.entries(toggleMap).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) currentSettings[key] = el.classList.contains('active');
+      });
+
+      const selectMap = {
+        'voice-mode-select':'voiceChatMode','graphics-quality-select':'graphicsQuality',
+        'shadow-quality-select':'shadowQuality','colorblind-select':'colorblindMode',
+      };
+      Object.entries(selectMap).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el && el.value) currentSettings[key] = el.value;
+      });
     }
     
     function applySettings() {
