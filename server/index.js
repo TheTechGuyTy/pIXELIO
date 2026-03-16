@@ -1,4 +1,10 @@
-require('dotenv').config();
+// ============== ADMIN USERNAMES ==============
+// Add usernames here to give admin access on login
+const ADMIN_USERNAMES = [
+  'jmanskills',
+  // Add more usernames below this line:
+];
+
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
@@ -1147,56 +1153,106 @@ io.on('connection', (socket) => {
   socket.on('admin-kick-player', async (data) => {
     try {
       const admin = await User.findById(socket.userId);
-      if (!admin || !admin.isAdmin) {
-        return socket.emit('error', { message: 'Admin access required' });
-      }
-      
+      if (!admin || !admin.isAdmin) return socket.emit('error', { message: 'Admin access required' });
       const gameId = playerGames.get(data.playerId);
       if (gameId) {
         const game = games.get(gameId);
         if (game) {
           game.players.delete(data.playerId);
           playerGames.delete(data.playerId);
-          
-          io.to(data.playerId).emit('kicked', {
-            reason: data.reason || 'Kicked by admin'
-          });
+          io.to(data.playerId).emit('kicked', { reason: data.reason || 'Kicked by admin' });
         }
       }
-      
       socket.emit('kick-success', { playerId: data.playerId });
-    } catch (error) {
-      console.error('Admin kick error:', error);
-    }
+    } catch (error) { console.error('Admin kick error:', error); }
   });
-  
+
   socket.on('admin-broadcast', async (data) => {
     try {
       const admin = await User.findById(socket.userId);
-      if (!admin || !admin.isAdmin) {
-        return socket.emit('error', { message: 'Admin access required' });
-      }
-      
-      io.emit('admin-message', {
-        message: data.message,
-        from: admin.username
-      });
-    } catch (error) {
-      console.error('Admin broadcast error:', error);
-    }
+      if (!admin || !admin.isAdmin) return socket.emit('error', { message: 'Admin access required' });
+      io.emit('admin-message', { message: data.message, from: admin.username });
+    } catch (error) { console.error('Admin broadcast error:', error); }
   });
-  
-  socket.on('admin-enable-aimbot', async (data) => {
+
+  socket.on('admin-force-end-game', async (data) => {
     try {
       const admin = await User.findById(socket.userId);
-      if (!admin || !admin.isAdmin) {
-        return socket.emit('error', { message: 'Admin access required' });
-      }
-      
-      socket.emit('aimbot-enabled', { enabled: data.enabled });
-    } catch (error) {
-      console.error('Admin aimbot error:', error);
-    }
+      if (!admin || !admin.isAdmin) return socket.emit('error', { message: 'Admin access required' });
+      const game = games.get(data.gameId);
+      if (!game) return socket.emit('error', { message: 'Game not found' });
+      game.state = 'ended';
+      io.to(data.gameId).emit('game-ended', { winner: 'Admin ended game', winnerId: null });
+      setTimeout(() => games.delete(data.gameId), 5000);
+      socket.emit('admin-action-success', { message: 'Game ended' });
+    } catch (error) { console.error('Admin force-end error:', error); }
+  });
+
+  socket.on('admin-get-games', async () => {
+    try {
+      const admin = await User.findById(socket.userId);
+      if (!admin || !admin.isAdmin) return;
+      const liveGames = Array.from(games.values()).map(g => ({
+        id: g.id,
+        code: g.code,
+        state: g.state,
+        playerCount: g.players.size,
+        players: Array.from(g.players.values()).map(p => ({ id: p.id, username: p.username, isAlive: p.isAlive })),
+        startTime: g.startTime
+      }));
+      socket.emit('admin-games-list', { games: liveGames });
+    } catch (error) { console.error('Admin get-games error:', error); }
+  });
+
+  socket.on('admin-join-game', async (data) => {
+    try {
+      const admin = await User.findById(socket.userId);
+      if (!admin || !admin.isAdmin) return;
+      const game = games.get(data.gameId);
+      if (!game) return socket.emit('error', { message: 'Game not found' });
+      // Add admin to game
+      const playerData = {
+        id: socket.id, username: admin.username, x: game.map.size/2, y: game.map.size/2,
+        health: 999, maxHealth: 999, shield: 0, weapon: 'rifle', ammo: 9999,
+        kills: 0, isAlive: true, skin: 'default', isAdmin: true, godMode: true,
+        materials: { wood: 999, brick: 999, metal: 999 }, activeEffects: [],
+        damageDealt: 0, damageTaken: 0, questionsCorrect: 0, questionsTotal: 0
+      };
+      game.players.set(socket.id, playerData);
+      playerGames.set(socket.id, game.id);
+      socket.join(game.id);
+      socket.emit('game-started', {
+        map: game.map, stormCenter: game.zoneCenter, stormRadius: game.zoneRadius,
+        triviaStations: game.triviaStations, powerups: game.powerups,
+        weaponSpawns: game.weaponSpawns, vehicles: game.vehicles,
+        buildings: game.buildings, chests: game.chests
+      });
+    } catch (error) { console.error('Admin join-game error:', error); }
+  });
+
+  socket.on('admin-god-mode', async (data) => {
+    try {
+      const admin = await User.findById(socket.userId);
+      if (!admin || !admin.isAdmin) return;
+      const gameId = playerGames.get(socket.id);
+      if (!gameId) return;
+      const game = games.get(gameId);
+      if (!game) return;
+      const player = game.players.get(socket.id);
+      if (!player) return;
+      player.godMode = data.enabled;
+      player.health = data.enabled ? 999 : 100;
+      socket.emit('god-mode-toggled', { enabled: data.enabled });
+    } catch (error) { console.error('Admin god-mode error:', error); }
+  });
+
+  socket.on('admin-mute-player', async (data) => {
+    try {
+      const admin = await User.findById(socket.userId);
+      if (!admin || !admin.isAdmin) return;
+      io.to(data.playerId).emit('chat-muted', { muted: data.muted });
+      socket.emit('admin-action-success', { message: `Player ${data.muted ? 'muted' : 'unmuted'}` });
+    } catch (error) { console.error('Admin mute error:', error); }
   });
   
   // ========== PLAYER MOVEMENT ==========
@@ -1486,7 +1542,7 @@ function startGameLoop(gameId) {
             damage -= shieldDamage;
           }
           
-          if (damage > 0) {
+          if (damage > 0 && !player.godMode) {
             player.health -= damage;
             player.damageTaken += damage;
           }
@@ -1604,7 +1660,7 @@ function startGameLoop(gameId) {
       if (!player.isAlive) continue;
       
       const distToCenter = Math.hypot(player.x - game.zoneCenter.x, player.y - game.zoneCenter.y);
-      if (distToCenter > game.zoneRadius) {
+      if (distToCenter > game.zoneRadius && !player.godMode) {
         player.health -= zoneDamage;
         player.damageTaken += zoneDamage;
         

@@ -1286,6 +1286,7 @@
       <div class="top-bar-left">
         <button class="top-button" onclick="openSettings()">⚙️ Settings</button>
         <button class="top-button" onclick="openProfile()">👤 Profile</button>
+        <button class="top-button" onclick="openNewsModal()">📰 News</button>
         <button class="top-button" onclick="toggleFriends()">
           👥 Friends
           <span id="friend-requests-badge" class="notification-badge">0</span>
@@ -1857,59 +1858,139 @@
   <div id="lobby-screen"></div>
   
   <!-- ADMIN PANEL -->
-  <div id="admin-panel" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 999999; overflow-y: auto;">
-    <div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <h1 style="color: white; font-size: 36px; margin: 0;">🛠️ Admin Panel</h1>
-        <button onclick="closeAdminPanel()" style="background: #ff4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold;">✕ Close</button>
+  <div id="admin-panel" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0f;z-index:999999;overflow-y:auto;font-family:inherit;">
+    <div style="max-width:1300px;margin:0 auto;padding:24px 20px;">
+
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1e1e2e;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:28px;font-weight:bold;color:white;">🛠️ Admin Panel</div>
+          <div id="admin-server-badge" style="background:#1e1e2e;color:#667eea;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #667eea;">Loading...</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div id="admin-godmode-indicator" style="display:none;background:#f59e0b;color:#000;font-size:12px;padding:5px 12px;border-radius:20px;font-weight:bold;">⚡ GOD MODE ON</div>
+          <button onclick="adminToggleGodMode()" style="background:#f59e0b;color:#000;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">⚡ God Mode</button>
+          <button onclick="closeAdminPanel()" style="background:#ef4444;color:white;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">✕ Close</button>
+        </div>
       </div>
-      
+
       <!-- Tabs -->
-      <div style="display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #333;">
-        <button class="admin-tab active" onclick="switchAdminTab('players')" data-tab="players" style="background: none; border: none; color: white; padding: 15px 25px; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600;">👥 Players</button>
-        <button class="admin-tab" onclick="switchAdminTab('games')" data-tab="games" style="background: none; border: none; color: white; padding: 15px 25px; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600;">🎮 Games</button>
-        <button class="admin-tab" onclick="switchAdminTab('broadcast')" data-tab="broadcast" style="background: none; border: none; color: white; padding: 15px 25px; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600;">📢 Broadcast</button>
-        <button class="admin-tab" onclick="switchAdminTab('coins')" data-tab="coins" style="background: none; border: none; color: white; padding: 15px 25px; font-size: 16px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600;">💰 Give Coins</button>
+      <div style="display:flex;gap:4px;margin-bottom:24px;background:#111118;border-radius:10px;padding:4px;">
+        <button class="admin-tab active" onclick="switchAdminTab('players')" data-tab="players" style="flex:1;background:rgba(102,126,234,0.2);border:none;color:white;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">👥 Players</button>
+        <button class="admin-tab" onclick="switchAdminTab('games')" data-tab="games" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">🎮 Games</button>
+        <button class="admin-tab" onclick="switchAdminTab('skins')" data-tab="skins" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">🎨 Skins</button>
+        <button class="admin-tab" onclick="switchAdminTab('coins')" data-tab="coins" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">💰 Coins</button>
+        <button class="admin-tab" onclick="switchAdminTab('broadcast')" data-tab="broadcast" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">📢 Broadcast</button>
+        <button class="admin-tab" onclick="switchAdminTab('news')" data-tab="news" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">📰 News</button>
+        <button class="admin-tab" onclick="switchAdminTab('admins')" data-tab="admins" style="flex:1;background:none;border:none;color:#888;padding:11px 8px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;">👑 Admins</button>
       </div>
-      
-      <!-- Players Tab -->
+
+      <!-- PLAYERS TAB -->
       <div id="admin-tab-players" class="admin-tab-content">
-        <div style="background: #1a1a1a; border-radius: 12px; padding: 20px;">
-          <h2 style="color: white; margin-bottom: 20px;">Player Management</h2>
-          <div style="margin-bottom: 20px;">
-            <input type="text" id="admin-player-search" placeholder="Search player by username..." style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #333; background: #222; color: white; font-size: 14px;" oninput="searchAdminPlayers()">
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <input type="text" id="admin-player-search" placeholder="Search by username..." oninput="searchAdminPlayers()"
+            style="flex:1;padding:11px 14px;border-radius:8px;border:1px solid #2a2a3e;background:#111118;color:white;font-size:14px;">
+          <button onclick="loadAdminPlayers()" style="background:#667eea;color:white;border:none;padding:11px 18px;border-radius:8px;cursor:pointer;font-weight:600;">↻ Refresh</button>
+        </div>
+        <div id="admin-players-list"></div>
+      </div>
+
+      <!-- GAMES TAB -->
+      <div id="admin-tab-games" class="admin-tab-content" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="color:white;font-size:18px;font-weight:bold;">Live Games</div>
+          <button onclick="adminRefreshGames()" style="background:#667eea;color:white;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:600;">↻ Refresh</button>
+        </div>
+        <div id="admin-stats-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;"></div>
+        <div id="admin-games-list"></div>
+      </div>
+
+      <!-- SKINS TAB -->
+      <div id="admin-tab-skins" class="admin-tab-content" style="display:none;">
+        <div style="background:#111118;border-radius:12px;padding:20px;color:white;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">Give / Remove Skin</div>
+          <input type="text" id="admin-skin-username" placeholder="Player username"
+            style="width:100%;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+          <select id="admin-skin-id" style="width:100%;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;margin-bottom:12px;">
+            <option value="default">Default</option>
+            <option value="pink">Pink Bot</option>
+            <option value="gold">Golden</option>
+            <option value="shadow">Shadow</option>
+            <option value="galaxy">Galaxy</option>
+            <option value="cyber">Cyber</option>
+            <option value="flame">Flame</option>
+            <option value="ocean">Ocean</option>
+            <option value="pug">Pug Bot</option>
+            <option value="neon">Neon</option>
+          </select>
+          <div style="display:flex;gap:10px;">
+            <button onclick="adminGiveSkin(false)" style="flex:1;background:#10b981;color:white;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">🎁 Give Skin</button>
+            <button onclick="adminGiveSkin(true)" style="flex:1;background:#ef4444;color:white;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">🗑️ Remove Skin</button>
           </div>
-          <div id="admin-players-list" style="color: white;"></div>
         </div>
       </div>
-      
-      <!-- Games Tab -->
-      <div id="admin-tab-games" class="admin-tab-content" style="display: none;">
-        <div style="background: #1a1a1a; border-radius: 12px; padding: 20px;">
-          <h2 style="color: white; margin-bottom: 20px;">Active Games</h2>
-          <div id="admin-games-list" style="color: white;"></div>
+
+      <!-- COINS TAB -->
+      <div id="admin-tab-coins" class="admin-tab-content" style="display:none;">
+        <div style="background:#111118;border-radius:12px;padding:20px;color:white;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">Give / Remove Coins</div>
+          <input type="text" id="admin-coins-username" placeholder="Player username"
+            style="width:100%;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+          <input type="number" id="admin-coins-amount" placeholder="Amount" min="1"
+            style="width:100%;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+          <div style="display:flex;gap:10px;">
+            <button onclick="givePlayerCoins()" style="flex:1;background:#f59e0b;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">💰 Give Coins</button>
+            <button onclick="adminRemoveCoins()" style="flex:1;background:#ef4444;color:white;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">💸 Remove Coins</button>
+          </div>
         </div>
       </div>
-      
-      <!-- Broadcast Tab -->
-      <div id="admin-tab-broadcast" class="admin-tab-content" style="display: none;">
-        <div style="background: #1a1a1a; border-radius: 12px; padding: 20px;">
-          <h2 style="color: white; margin-bottom: 20px;">Send Global Message</h2>
-          <textarea id="admin-broadcast-message" placeholder="Type your message here..." style="width: 100%; height: 150px; padding: 12px; border-radius: 8px; border: 2px solid #333; background: #222; color: white; font-size: 14px; resize: vertical; font-family: inherit;" maxlength="500"></textarea>
-          <button onclick="sendAdminBroadcast()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%;">📢 Send to All Players</button>
-          <p style="color: #888; font-size: 12px; margin-top: 10px;">This will appear as a notification for all online players</p>
+
+      <!-- BROADCAST TAB -->
+      <div id="admin-tab-broadcast" class="admin-tab-content" style="display:none;">
+        <div style="background:#111118;border-radius:12px;padding:20px;color:white;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">📢 Broadcast to All Players</div>
+          <textarea id="admin-broadcast-message" placeholder="Type announcement..." maxlength="500"
+            style="width:100%;height:120px;padding:12px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+          <button onclick="sendAdminBroadcast()" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:13px;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px;">📢 Send to Everyone</button>
+          <p style="color:#555;font-size:12px;margin-top:8px;">Shows as a popup notification for all online players</p>
         </div>
       </div>
-      
-      <!-- Coins Tab -->
-      <div id="admin-tab-coins" class="admin-tab-content" style="display: none;">
-        <div style="background: #1a1a1a; border-radius: 12px; padding: 20px;">
-          <h2 style="color: white; margin-bottom: 20px;">Give Coins to Player</h2>
-          <input type="text" id="admin-coins-username" placeholder="Player username" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #333; background: #222; color: white; font-size: 14px; margin-bottom: 15px;">
-          <input type="number" id="admin-coins-amount" placeholder="Amount of coins" min="1" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #333; background: #222; color: white; font-size: 14px; margin-bottom: 15px;">
-          <button onclick="givePlayerCoins()" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #000; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; width: 100%;">💰 Give Coins</button>
+
+      <!-- NEWS TAB -->
+      <div id="admin-tab-news" class="admin-tab-content" style="display:none;">
+        <div style="background:#111118;border-radius:12px;padding:20px;color:white;margin-bottom:16px;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">📰 Post News</div>
+          <input type="text" id="admin-news-title" placeholder="News title..."
+            style="width:100%;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+          <textarea id="admin-news-body" placeholder="News content..." maxlength="500"
+            style="width:100%;height:100px;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;resize:vertical;font-family:inherit;box-sizing:border-box;margin-bottom:10px;"></textarea>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <select id="admin-news-type" style="padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;">
+              <option value="update">🔧 Update</option>
+              <option value="event">🎉 Event</option>
+              <option value="maintenance">⚠️ Maintenance</option>
+              <option value="season">🌟 Season</option>
+            </select>
+            <button onclick="adminPostNews()" style="flex:1;background:#10b981;color:white;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;">Post News</button>
+          </div>
+        </div>
+        <div style="font-size:15px;font-weight:bold;color:white;margin-bottom:12px;">Recent Posts</div>
+        <div id="admin-news-list"></div>
+      </div>
+
+      <!-- ADMINS TAB -->
+      <div id="admin-tab-admins" class="admin-tab-content" style="display:none;">
+        <div style="background:#111118;border-radius:12px;padding:20px;color:white;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">👑 Add Admin by Username</div>
+          <div style="display:flex;gap:10px;">
+            <input type="text" id="admin-new-admin-username" placeholder="Username to make admin"
+              style="flex:1;padding:11px;border-radius:8px;border:1px solid #2a2a3e;background:#0a0a0f;color:white;font-size:14px;">
+            <button onclick="adminAddByUsername()" style="background:#667eea;color:white;border:none;padding:11px 20px;border-radius:8px;cursor:pointer;font-weight:700;">Make Admin</button>
+          </div>
+          <p style="color:#555;font-size:12px;margin-top:10px;">Or add their username directly to ADMIN_USERNAMES in server/index.js for permanent access.</p>
         </div>
       </div>
+
     </div>
   </div>
   
@@ -2048,7 +2129,69 @@
   </div>
   <div id="postgame-screen"></div>
 
-  <!-- ===== CHAT OVERLAY (sits on top of 3D canvas) ===== -->
+  <!-- ===== IN-GAME HUD (overlays the 3D canvas) ===== -->
+  <div id="game-hud" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:200;pointer-events:none;font-family:inherit;">
+
+    <!-- Health + Shield bar (bottom left) -->
+    <div style="position:absolute;bottom:30px;left:24px;width:260px;">
+      <div style="display:flex;justify-content:space-between;color:white;font-size:12px;font-weight:600;margin-bottom:4px;text-shadow:0 1px 3px #000;">
+        <span>❤️ <span id="hud-health">100</span>/<span id="hud-max-health">100</span></span>
+        <span>🛡️ <span id="hud-shield">0</span></span>
+      </div>
+      <div style="background:rgba(0,0,0,0.5);border-radius:6px;height:10px;margin-bottom:5px;overflow:hidden;">
+        <div id="hud-health-bar" style="background:linear-gradient(90deg,#ef4444,#f87171);height:100%;width:100%;border-radius:6px;transition:width 0.2s;"></div>
+      </div>
+      <div style="background:rgba(0,0,0,0.5);border-radius:6px;height:7px;overflow:hidden;">
+        <div id="hud-shield-bar" style="background:linear-gradient(90deg,#60a5fa,#93c5fd);height:100%;width:0%;border-radius:6px;transition:width 0.2s;"></div>
+      </div>
+    </div>
+
+    <!-- Weapon + Ammo (bottom center) -->
+    <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);text-align:center;">
+      <div id="hud-weapon-name" style="color:white;font-size:14px;font-weight:bold;text-shadow:0 1px 4px #000;margin-bottom:4px;"></div>
+      <div style="background:rgba(0,0,0,0.6);border-radius:8px;padding:6px 18px;display:inline-block;">
+        <span id="hud-ammo" style="color:#fbbf24;font-size:18px;font-weight:bold;">∞</span>
+        <span style="color:#888;font-size:13px;"> ammo</span>
+      </div>
+    </div>
+
+    <!-- Kills + Players (top right) -->
+    <div style="position:absolute;top:20px;right:20px;text-align:right;">
+      <div style="background:rgba(0,0,0,0.6);border-radius:10px;padding:10px 16px;margin-bottom:8px;display:inline-block;">
+        <div style="color:#f87171;font-size:22px;font-weight:bold;line-height:1;" id="hud-kills">0</div>
+        <div style="color:#888;font-size:11px;margin-top:2px;">kills</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.6);border-radius:10px;padding:10px 16px;display:inline-block;margin-left:8px;">
+        <div style="color:#a5b4fc;font-size:22px;font-weight:bold;line-height:1;" id="hud-players-alive">–</div>
+        <div style="color:#888;font-size:11px;margin-top:2px;">alive</div>
+      </div>
+    </div>
+
+    <!-- Danger Zone timer (top center) -->
+    <div id="hud-zone-warning" style="position:absolute;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,255,220,0.15);border:1px solid #00ffdc;border-radius:8px;padding:6px 16px;display:none;">
+      <span style="color:#00ffdc;font-size:13px;font-weight:bold;">⚡ DANGER ZONE CLOSING</span>
+    </div>
+
+    <!-- Minimap (top left) -->
+    <div style="position:absolute;top:20px;left:20px;">
+      <canvas id="hud-minimap" width="150" height="150" style="border-radius:10px;border:2px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.5);"></canvas>
+    </div>
+
+    <!-- Kill feed (right side below kills) -->
+    <div id="hud-killfeed" style="position:absolute;top:110px;right:20px;width:220px;"></div>
+
+  </div>
+
+  <!-- ===== NEWS TAB on menu ===== -->
+  <div id="news-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:999998;overflow-y:auto;font-family:inherit;">
+    <div style="max-width:600px;margin:40px auto;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:20px;padding:32px;color:white;position:relative;">
+      <button onclick="document.getElementById('news-modal').style.display='none'" style="position:absolute;top:16px;right:20px;background:none;border:none;color:rgba(255,255,255,0.6);font-size:28px;cursor:pointer;">×</button>
+      <div style="font-size:24px;font-weight:bold;margin-bottom:20px;">📰 News &amp; Updates</div>
+      <div id="menu-news-list"><div style="color:#555;text-align:center;padding:40px;">Loading...</div></div>
+    </div>
+  </div>
+
+
   <div id="game-chat" style="display:none; position:fixed; bottom:20px; left:20px; width:320px; height:280px; background:rgba(0,0,0,0.75); border-radius:12px; flex-direction:column; z-index:500; font-family:inherit;">
     <div style="padding:8px 14px; background:rgba(102,126,234,0.6); border-radius:12px 12px 0 0; color:white; font-weight:bold; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
       💬 Chat <span style="font-size:11px; opacity:0.7;">Enter to send · Esc to close</span>
@@ -2330,10 +2473,11 @@
     function showMenuScreen() {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'block';
-      // Hide chat overlay when back in menu
+      hideHUD();
       const chat = document.getElementById('game-chat');
       if (chat) chat.style.display = 'none';
       _chatOpen = false;
+      window._chatOpen = false;
       updateUserDisplay();
       updateMenuLockerPreview();
     }
@@ -3484,13 +3628,286 @@
       console.log('✅ Settings applied');
     }
 
+    // ========== HUD SYSTEM ==========
+    function showHUD() {
+      document.getElementById('game-hud').style.display = 'block';
+    }
+    function hideHUD() {
+      document.getElementById('game-hud').style.display = 'none';
+      if (window._hudInterval) { clearInterval(window._hudInterval); window._hudInterval = null; }
+    }
+
+    function startHUDLoop() {
+      if (window._hudInterval) clearInterval(window._hudInterval);
+      window._hudInterval = setInterval(updateHUD, 100);
+    }
+
+    function updateHUD() {
+      if (!window._gameActive || !socket) return;
+
+      // Find my player from last game update
+      const me = window._lastPlayers?.find(p => p.id === socket.id);
+      if (!me) return;
+
+      // Health bar
+      const hp    = Math.max(0, me.health || 0);
+      const maxHp = me.maxHealth || 100;
+      const sh    = Math.max(0, me.shield || 0);
+      const maxSh = me.maxShield || 100;
+      document.getElementById('hud-health').textContent    = Math.round(hp);
+      document.getElementById('hud-max-health').textContent = maxHp;
+      document.getElementById('hud-shield').textContent    = Math.round(sh);
+      document.getElementById('hud-health-bar').style.width = `${(hp/maxHp)*100}%`;
+      document.getElementById('hud-shield-bar').style.width = `${(sh/maxSh)*100}%`;
+
+      // Color health bar red when low
+      const hpBar = document.getElementById('hud-health-bar');
+      hpBar.style.background = hp < 30
+        ? 'linear-gradient(90deg,#dc2626,#ef4444)'
+        : 'linear-gradient(90deg,#ef4444,#f87171)';
+
+      // Weapon + ammo
+      const wName = me.weapon ? me.weapon.replace(/_/g,' ').toUpperCase() : '';
+      document.getElementById('hud-weapon-name').textContent = wName;
+      document.getElementById('hud-ammo').textContent = me.ammo ?? '∞';
+
+      // Kills + players alive
+      document.getElementById('hud-kills').textContent = me.kills || 0;
+      const alive = (window._lastPlayers || []).filter(p => p.isAlive).length;
+      document.getElementById('hud-players-alive').textContent = alive;
+
+      // Zone warning
+      const zoneWarn = document.getElementById('hud-zone-warning');
+      if (gameState?.zoneRadius && gameState.zoneRadius < 800) {
+        zoneWarn.style.display = 'block';
+      } else {
+        zoneWarn.style.display = 'none';
+      }
+
+      // Kill feed
+      updateKillFeed();
+
+      // Minimap
+      drawMinimap();
+    }
+
+    // ========== MINIMAP ==========
+    function drawMinimap() {
+      const canvas = document.getElementById('hud-minimap');
+      if (!canvas || !gameState?.map || !window._lastPlayers) return;
+      const ctx2 = canvas.getContext('2d');
+      const size  = canvas.width;
+      const mSize = gameState.map.size;
+      const scale = size / mSize;
+
+      ctx2.clearRect(0, 0, size, size);
+
+      // Background
+      ctx2.fillStyle = 'rgba(20,30,20,0.9)';
+      ctx2.fillRect(0, 0, size, size);
+
+      // Zone circle
+      if (gameState.zoneRadius && gameState.zoneCenter) {
+        const zx = gameState.zoneCenter.x * scale;
+        const zy = gameState.zoneCenter.y * scale;
+        const zr = gameState.zoneRadius * scale;
+        ctx2.strokeStyle = '#00ffdc';
+        ctx2.lineWidth = 1.5;
+        ctx2.beginPath();
+        ctx2.arc(zx, zy, zr, 0, Math.PI * 2);
+        ctx2.stroke();
+        // Outside tint
+        ctx2.fillStyle = 'rgba(0,255,220,0.06)';
+        ctx2.fillRect(0, 0, size, size);
+        ctx2.save();
+        ctx2.globalCompositeOperation = 'destination-out';
+        ctx2.beginPath();
+        ctx2.arc(zx, zy, zr, 0, Math.PI * 2);
+        ctx2.fill();
+        ctx2.restore();
+      }
+
+      // Buildings (tiny dots)
+      if (gameState.buildings) {
+        ctx2.fillStyle = 'rgba(160,140,100,0.5)';
+        gameState.buildings.forEach(b => {
+          ctx2.fillRect(b.x*scale - 2, b.y*scale - 2, 4, 4);
+        });
+      }
+
+      // Other players
+      window._lastPlayers.forEach(p => {
+        if (!p.isAlive) return;
+        const px = p.x * scale;
+        const py = p.y * scale;
+        ctx2.beginPath();
+        ctx2.arc(px, py, p.id === socket.id ? 5 : 3, 0, Math.PI * 2);
+        ctx2.fillStyle = p.id === socket.id ? '#a5b4fc' : '#f87171';
+        ctx2.fill();
+      });
+
+      // Border
+      ctx2.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx2.lineWidth = 1;
+      ctx2.strokeRect(0, 0, size, size);
+    }
+
+    // ========== KILL FEED ==========
+    let _killFeedItems = [];
+    function updateKillFeed() {
+      const el = document.getElementById('hud-killfeed');
+      if (!el) return;
+      // Prune old items
+      const now = Date.now();
+      _killFeedItems = _killFeedItems.filter(i => now - i.time < 5000);
+      el.innerHTML = _killFeedItems.slice(0,5).map(i =>
+        `<div style="background:rgba(0,0,0,0.6);border-radius:6px;padding:5px 10px;margin-bottom:4px;font-size:12px;color:white;text-align:right;border-left:3px solid ${i.self?'#a5b4fc':'#f87171'};">
+          <span style="color:#fbbf24;">${i.killer}</span> ⚡ <span style="color:#f87171;">${i.victim}</span>
+        </div>`
+      ).join('');
+    }
+
+    function addKillFeedItem(killer, victim) {
+      _killFeedItems.unshift({ killer, victim, time: Date.now(), self: killer === currentUser?.username });
+    }
+
+    // ========== WEAPON PICKUPS IN 3D ==========
+    function updateWeaponPickups3D() {
+      if (!game3D || !gameState?.weaponSpawns) return;
+      // Remove old weapon meshes
+      if (!game3D._weaponMeshes) game3D._weaponMeshes = new Map();
+      const seen = new Set();
+      const half = gameState.map.size / 2;
+      const rarityColors = { common:0xaaaaaa, uncommon:0x22c55e, rare:0x3b82f6, epic:0xa855f7, legendary:0xf59e0b };
+
+      gameState.weaponSpawns.forEach(w => {
+        if (w.collected) {
+          if (game3D._weaponMeshes.has(w.id)) {
+            game3D.scene.remove(game3D._weaponMeshes.get(w.id));
+            game3D._weaponMeshes.delete(w.id);
+          }
+          return;
+        }
+        seen.add(w.id);
+        if (!game3D._weaponMeshes.has(w.id)) {
+          const color = rarityColors[w.rarity] || rarityColors.common;
+          const geo   = new THREE.BoxGeometry(8, 3, 18);
+          const mat   = new THREE.MeshLambertMaterial({ color });
+          const mesh  = new THREE.Mesh(geo, mat);
+          mesh.position.set(w.x - half, 4, w.y - half);
+          mesh.castShadow = true;
+          game3D.scene.add(mesh);
+
+          // Glow ring underneath
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(10, 14, 16),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+          );
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(w.x - half, 0.5, w.y - half);
+          game3D.scene.add(ring);
+
+          game3D._weaponMeshes.set(w.id, { mesh, ring });
+        }
+        // Bob animation
+        const entry = game3D._weaponMeshes.get(w.id);
+        if (entry?.mesh) {
+          entry.mesh.position.y = 4 + Math.sin(Date.now() / 600 + w.x) * 2;
+          entry.mesh.rotation.y += 0.02;
+        }
+      });
+
+      // Remove collected
+      game3D._weaponMeshes.forEach((entry, id) => {
+        if (!seen.has(id)) {
+          game3D.scene.remove(entry.mesh);
+          game3D.scene.remove(entry.ring);
+          game3D._weaponMeshes.delete(id);
+        }
+      });
+    }
+
+    // ========== POST-GAME REWARD SCREEN ==========
+    function showRewardScreen(data) {
+      const me = data.stats?.find(s => s.username === currentUser?.username);
+      const xp    = me?.xpGained    || Math.floor(50 + (me?.kills||0)*25);
+      const coins = me?.coinsGained  || Math.floor(20 + (me?.kills||0)*10 + (me?.placement===1?100:0));
+      const won   = data.winnerId === socket.id;
+
+      const el = document.createElement('div');
+      el.id = 'reward-screen';
+      el.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit;color:white;';
+      el.innerHTML = `
+        <div style="text-align:center;max-width:480px;padding:20px;">
+          <div style="font-size:56px;margin-bottom:8px;">${won?'🏆':'💀'}</div>
+          <div style="font-size:36px;font-weight:bold;margin-bottom:4px;color:${won?'#FFD700':'#ef4444'};">${won?'Victory!':'Eliminated'}</div>
+          <div style="color:#888;font-size:14px;margin-bottom:32px;">${won?'Last Pixel Standing':'Taken out by '+data.killerName}</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:28px;">
+            ${[['Kills',me?.kills||0,'#f87171'],['Placement',`#${me?.placement||'–'}`,'#a5b4fc'],['Damage',me?.damageDealt||0,'#fbbf24']].map(([l,v,c])=>`
+              <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
+                <div style="font-size:24px;font-weight:bold;color:${c};">${v}</div>
+                <div style="font-size:12px;color:#555;margin-top:3px;">${l}</div>
+              </div>`).join('')}
+          </div>
+
+          <div style="display:flex;gap:16px;justify-content:center;margin-bottom:28px;">
+            <div style="background:rgba(102,126,234,0.2);border:1px solid #667eea;border-radius:12px;padding:14px 24px;text-align:center;">
+              <div style="font-size:22px;font-weight:bold;color:#a5b4fc;">+${xp}</div>
+              <div style="font-size:12px;color:#667eea;margin-top:2px;">XP</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;border-radius:12px;padding:14px 24px;text-align:center;">
+              <div style="font-size:22px;font-weight:bold;color:#fbbf24;">+${coins}</div>
+              <div style="font-size:12px;color:#d97706;margin-top:2px;">Coins</div>
+            </div>
+          </div>
+
+          <button onclick="document.getElementById('reward-screen').remove();showMenuScreen();"
+            style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:14px 48px;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer;">
+            Back to Menu
+          </button>
+        </div>`;
+      document.body.appendChild(el);
+    }
+
+    // ========== NEWS MODAL ==========
+    async function openNewsModal() {
+      document.getElementById('news-modal').style.display = 'block';
+      const list = document.getElementById('menu-news-list');
+      try {
+        const res  = await fetch('/api/admin/news');
+        const data = await res.json();
+        if (!data.news?.length) {
+          list.innerHTML = '<div style="color:#555;text-align:center;padding:40px;">No news yet — check back soon!</div>';
+          return;
+        }
+        const typeEmoji = { update:'🔧', event:'🎉', maintenance:'⚠️', season:'🌟' };
+        list.innerHTML = data.news.map(n => `
+          <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:18px;">${typeEmoji[n.type]||'📰'}</span>
+              <span style="font-weight:bold;font-size:15px;">${n.title}</span>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.5;">${n.body}</div>
+            <div style="font-size:11px;color:#444;margin-top:8px;">${new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+          </div>`).join('');
+      } catch(e) {
+        list.innerHTML = '<div style="color:#f87171;text-align:center;padding:40px;">Failed to load news</div>';
+      }
+    }
+
     // ========== GAME FUNCTIONS (simplified for now) ==========
     function setupGameHandlers() {
       // Add your existing game handlers here
     }
 
     function quickPlay() {
-      alert('Quick Play coming soon!');
+      if (!currentUser) { alert('Please log in to play'); return; }
+      // Create a game and go straight to lobby — friends can join with the code
+      socket.emit('create-game', {
+        username: currentUser.username,
+        skin: window.playerLoadout?.skin || selectedSkin || 'default'
+      });
     }
 
     function showJoinGameModal() {
@@ -4059,6 +4476,12 @@
       // Clear keys and activate input
       window._pixelioKeys = {};
       window._gameActive  = true;
+      window._lastPlayers = [];
+      _killFeedItems = [];
+
+      // Show HUD + minimap, start update loop
+      showHUD();
+      startHUDLoop();
 
       // Show chat overlay
       const chat = document.getElementById('game-chat');
@@ -5124,9 +5547,20 @@
         if (data.buildings) gameState.buildings = data.buildings;
         if (data.chests) gameState.chests = data.chests;
         
-        // UPDATE 3D ENGINE WITH NEW V2!
+        // UPDATE 3D ENGINE
         if (game3D && data.players && gameState.map) {
+          window._lastPlayers = data.players;
           game3D.updatePlayers(data.players, gameState.map.size);
+          updateWeaponPickups3D();
+        }
+
+        // Update kill feed from server kill feed array
+        if (data.killFeed && Array.isArray(data.killFeed)) {
+          data.killFeed.forEach(k => {
+            if (!_killFeedItems.find(i => i.killer === k.killer && i.victim === k.victim && Date.now() - i.time < 2000)) {
+              addKillFeedItem(k.killer, k.victim);
+            }
+          });
         }
       });
       
@@ -5139,22 +5573,6 @@
       
       socket.on('player-died', (data) => {
         console.log('💀 You died!', data);
-        if (!window._gameActive) return; // already handled
-        
-        window._gameActive = false;
-        window._pixelioKeys = {};
-        if (game3D) { game3D.destroy(); game3D = null; }
-        document.getElementById('game-screen').style.display = 'none';
-        const chat = document.getElementById('game-chat');
-        if (chat) chat.style.display = 'none';
-
-        showEliminatedScreen(data.killerName);
-      });
-      
-      socket.on('game-ended', (data) => {
-        console.log('🎮 Game ended!', data);
-
-        // If already showing eliminated screen, don't overwrite it
         if (!window._gameActive) return;
 
         window._gameActive = false;
@@ -5163,14 +5581,32 @@
         document.getElementById('game-screen').style.display = 'none';
         const chat = document.getElementById('game-chat');
         if (chat) chat.style.display = 'none';
+        hideHUD();
 
-        // Only show win screen if this socket is the actual winner
+        // Show eliminated screen then reward screen
+        showEliminatedScreen(data.killerName);
+      });
+
+      socket.on('game-ended', (data) => {
+        console.log('🎮 Game ended!', data);
+        if (!window._gameActive) return;
+
+        window._gameActive = false;
+        window._pixelioKeys = {};
+        if (game3D) { game3D.destroy(); game3D = null; }
+        document.getElementById('game-screen').style.display = 'none';
+        const chat = document.getElementById('game-chat');
+        if (chat) chat.style.display = 'none';
+        hideHUD();
+
         if (data.winnerId === socket.id) {
           showWinScreen(data.winner);
-        } else {
-          // Fallback — if somehow player-died wasn't received
+        } else if (window._gameActive === false && !document.getElementById('end-screen-overlay')) {
           showEliminatedScreen(data.winner || 'another player');
         }
+
+        // Show reward screen after a short delay
+        setTimeout(() => showRewardScreen(data), 2500);
         showMenuScreen();
         document.getElementById('menu-screen').style.zIndex = '9999';
       });
@@ -5444,85 +5880,90 @@
       });
     }
 
+    // ========== ADMIN PANEL ==========
+    let _adminGodMode = false;
+
+    function adminFetch(path, options = {}) {
+      return fetch(path, {
+        ...options,
+        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', ...(options.headers||{}) }
+      });
+    }
+
+    function adminInput(id) {
+      return (document.getElementById(id)?.value || '').trim();
+    }
+
     function openAdminPanel() {
-      if (!currentUser || !currentUser.isAdmin) {
-        alert('❌ Access Denied');
-        return;
-      }
+      if (!currentUser?.isAdmin) { alert('❌ Admin access required'); return; }
       document.getElementById('admin-panel').style.display = 'block';
       switchAdminTab('players');
+      adminUpdateServerBadge();
     }
 
     function closeAdminPanel() {
       document.getElementById('admin-panel').style.display = 'none';
     }
 
-    function switchAdminTab(tabName) {
-      document.querySelectorAll('.admin-tab').forEach(tab => {
-        tab.classList.remove('active');
-        tab.style.borderBottomColor = 'transparent';
+    function switchAdminTab(name) {
+      document.querySelectorAll('.admin-tab').forEach(t => {
+        const active = t.dataset.tab === name;
+        t.style.background = active ? 'rgba(102,126,234,0.2)' : 'none';
+        t.style.color = active ? 'white' : '#888';
       });
-      const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
-      if (activeTab) {
-        activeTab.classList.add('active');
-        activeTab.style.borderBottomColor = '#667eea';
-      }
       document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
-      document.getElementById(`admin-tab-${tabName}`).style.display = 'block';
-
-      if (tabName === 'players') loadAdminPlayers();
-      if (tabName === 'games')   loadAdminGames();
-      if (tabName === 'stats')   loadAdminStats();
+      document.getElementById(`admin-tab-${name}`).style.display = 'block';
+      if (name === 'players')  loadAdminPlayers();
+      if (name === 'games')    adminRefreshGames();
+      if (name === 'news')     adminLoadNews();
     }
 
-    // ── PLAYERS TAB ──────────────────────────────────────
+    function adminUpdateServerBadge() {
+      adminFetch('/api/admin/stats').then(r => r.json()).then(d => {
+        const el = document.getElementById('admin-server-badge');
+        if (el) el.textContent = `${d.onlinePlayers ?? 0} online · ${d.activeGames ?? 0} games`;
+      }).catch(()=>{});
+    }
+
+    // ── PLAYERS ────────────────────────────────────────
     async function loadAdminPlayers(search = '') {
       const list = document.getElementById('admin-players-list');
-      list.innerHTML = '<p style="color:#888;">Loading...</p>';
+      list.innerHTML = '<p style="color:#555;padding:20px;">Loading...</p>';
       try {
-        const res = await adminFetch(`/api/admin/users?limit=50&search=${encodeURIComponent(search)}`);
+        const res = await adminFetch(`/api/admin/users?limit=100&search=${encodeURIComponent(search)}`);
         const data = await res.json();
         if (!res.ok) { list.innerHTML = `<p style="color:#f87171;">${data.error}</p>`; return; }
         renderAdminPlayers(data.users);
-      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load players</p>'; }
+      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load</p>'; }
     }
 
     function renderAdminPlayers(users) {
       const list = document.getElementById('admin-players-list');
-      if (!users || users.length === 0) {
-        list.innerHTML = '<p style="color:#888;">No players found</p>';
-        return;
-      }
+      if (!users?.length) { list.innerHTML = '<p style="color:#555;padding:20px;">No players found</p>'; return; }
       list.innerHTML = users.map(u => `
-        <div style="background:#1a1a2e;padding:14px 16px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #333;">
+        <div style="background:#111118;padding:13px 16px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #1e1e2e;">
           <div>
-            <div style="font-size:15px;font-weight:600;color:white;margin-bottom:3px;">
+            <div style="font-size:14px;font-weight:600;color:white;margin-bottom:3px;">
               ${u.username}
-              ${u.isAdmin ? '<span style="background:#667eea;color:white;font-size:11px;padding:2px 7px;border-radius:4px;margin-left:6px;">ADMIN</span>' : ''}
-              ${u.isBanned ? '<span style="background:#ef4444;color:white;font-size:11px;padding:2px 7px;border-radius:4px;margin-left:6px;">BANNED</span>' : ''}
+              ${u.isAdmin?'<span style="background:#667eea;color:white;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:5px;">ADMIN</span>':''}
+              ${u.isBanned?'<span style="background:#ef4444;color:white;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:5px;">BANNED</span>':''}
             </div>
-            <div style="font-size:12px;color:#888;">
-              Level ${u.stats?.level || 1} &nbsp;|&nbsp; ${u.isOnline ? '🟢 Online' : '⚫ Offline'}
-            </div>
+            <div style="font-size:11px;color:#555;">Lv ${u.stats?.level||1} · ${u.isOnline?'🟢 Online':'⚫ Offline'}</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            <button onclick="openPlayerDetail('${u._id}','${u.username}')"
-              style="background:#667eea;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
-              View
-            </button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+            <button onclick="openPlayerDetail('${u._id}','${u.username}')" style="background:#1e1e2e;color:#a5b4fc;border:1px solid #2a2a3e;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">View</button>
             ${u.isBanned
-              ? `<button onclick="adminUnban('${u._id}')" style="background:#10b981;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Unban</button>`
-              : `<button onclick="adminBan('${u._id}','${u.username}')" style="background:#ef4444;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Ban</button>`
-            }
-            ${!u.isAdmin ? `<button onclick="adminMakeAdmin('${u._id}','${u.username}')" style="background:#f59e0b;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Make Admin</button>` : ''}
+              ?`<button onclick="adminUnban('${u._id}')" style="background:#10b981;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Unban</button>`
+              :`<button onclick="adminBan('${u._id}','${u.username}')" style="background:#ef4444;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Ban</button>`}
+            <button onclick="adminKick('${u._id}','${u.username}')" style="background:#f59e0b;color:#000;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Kick</button>
+            <button onclick="adminToggleMute('${u._id}','${u.username}')" style="background:#374151;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Mute</button>
+            ${!u.isAdmin?`<button onclick="adminMakeAdmin('${u._id}','${u.username}')" style="background:#7c3aed;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">👑 Admin</button>`:''}
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
 
     function searchAdminPlayers() {
-      const q = document.getElementById('admin-player-search').value;
-      loadAdminPlayers(q);
+      loadAdminPlayers(document.getElementById('admin-player-search').value);
     }
 
     async function openPlayerDetail(userId, username) {
@@ -5531,193 +5972,277 @@
         const data = await res.json();
         if (!res.ok) { alert(data.error); return; }
         const u = data.user;
-        const wins = u.stats?.wins ?? 0;
-        const games = u.stats?.gamesPlayed ?? 0;
-        const kills = u.stats?.kills ?? 0;
-        const coins = u.stats?.coins ?? 0;
-        const level = u.stats?.level ?? 1;
-        const winRate = games > 0 ? ((wins/games)*100).toFixed(1) : '0.0';
-
-        const detail = document.createElement('div');
-        detail.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:9999999;display:flex;align-items:center;justify-content:center;';
-        detail.innerHTML = `
-          <div style="background:#1a1a2e;border-radius:16px;padding:28px;max-width:480px;width:90%;color:white;border:1px solid #333;">
+        const el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.75);z-index:9999999;display:flex;align-items:center;justify-content:center;';
+        el.innerHTML = `
+          <div style="background:#111118;border-radius:16px;padding:28px;max-width:500px;width:90%;color:white;border:1px solid #1e1e2e;max-height:90vh;overflow-y:auto;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-              <div style="font-size:22px;font-weight:bold;">${u.username}</div>
-              <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;">×</button>
+              <div style="font-size:20px;font-weight:bold;">${u.username}</div>
+              <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;">×</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
-              ${[['Level',level],['Coins',coins.toLocaleString()],['Wins',wins],['Win Rate',winRate+'%'],['Kills',kills],['Games',games]].map(([l,v])=>`
-                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
-                  <div style="font-size:20px;font-weight:bold;">${v}</div>
-                  <div style="font-size:12px;color:#888;margin-top:2px;">${l}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+              ${[['Level',u.stats?.level||1],['Coins',(u.stats?.coins||0).toLocaleString()],['Wins',u.stats?.wins||0],['K/D',u.kdRatio||'0.00'],['Kills',u.stats?.kills||0],['Games',u.stats?.gamesPlayed||0]].map(([l,v])=>`
+                <div style="background:#0a0a0f;border-radius:8px;padding:10px;text-align:center;border:1px solid #1e1e2e;">
+                  <div style="font-size:18px;font-weight:bold;">${v}</div>
+                  <div style="font-size:11px;color:#555;margin-top:2px;">${l}</div>
                 </div>`).join('')}
             </div>
-            <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;gap:8px;">
-                <input id="detail-coins-amt" type="number" min="1" placeholder="Coins amount"
-                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #333;background:#111;color:white;font-size:14px;">
+                <input id="dp-coins" type="number" min="1" placeholder="Coins amount"
+                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #1e1e2e;background:#0a0a0f;color:white;font-size:13px;">
                 <button onclick="adminGiveCoinsById('${u._id}','${u.username}')"
-                  style="background:#f59e0b;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
-                  💰 Give Coins
-                </button>
+                  style="background:#f59e0b;color:#000;border:none;padding:9px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;">Give 💰</button>
+                <button onclick="adminRemoveCoinsById('${u._id}','${u.username}')"
+                  style="background:#ef4444;color:white;border:none;padding:9px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;">Remove 💸</button>
               </div>
               <div style="display:flex;gap:8px;">
-                <input id="detail-ban-reason" type="text" placeholder="Ban reason (optional)"
-                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #333;background:#111;color:white;font-size:14px;">
+                <input id="dp-ban-reason" type="text" placeholder="Ban reason"
+                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #1e1e2e;background:#0a0a0f;color:white;font-size:13px;">
                 <button onclick="adminBanWithReason('${u._id}','${u.username}')"
-                  style="background:#ef4444;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
-                  🔨 Ban
-                </button>
+                  style="background:#ef4444;color:white;border:none;padding:9px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;">🔨 Ban</button>
               </div>
-              <button onclick="adminResetStats('${u._id}','${u.username}')"
-                style="background:#374151;color:white;border:none;padding:9px;border-radius:6px;cursor:pointer;font-size:13px;">
-                🔄 Reset Stats
-              </button>
+              <div style="display:flex;gap:8px;">
+                <button onclick="adminKick('${u._id}','${u.username}');this.closest('div[style*=fixed]').remove()"
+                  style="flex:1;background:#f59e0b;color:#000;border:none;padding:9px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">⚡ Kick from Game</button>
+                <button onclick="adminResetStats('${u._id}','${u.username}')"
+                  style="flex:1;background:#374151;color:white;border:none;padding:9px;border-radius:6px;cursor:pointer;font-size:13px;">🔄 Reset Stats</button>
+              </div>
             </div>
           </div>`;
-        document.body.appendChild(detail);
+        document.body.appendChild(el);
       } catch(e) { alert('Failed to load player details'); }
-    }
-
-    async function adminGiveCoinsById(userId, username) {
-      const amount = parseInt(document.getElementById('detail-coins-amt')?.value);
-      if (!amount || amount < 1) { alert('Enter a valid amount'); return; }
-      try {
-        const res = await adminFetch('/api/admin/give-coins', {
-          method: 'POST',
-          body: JSON.stringify({ userId, amount })
-        });
-        const data = await res.json();
-        if (res.ok) { adminToast(`✅ Gave ${amount} coins to ${username}`); }
-        else { alert(data.error || 'Failed'); }
-      } catch(e) { alert('Error: ' + e.message); }
     }
 
     async function adminBan(userId, username) {
       const reason = prompt(`Ban reason for ${username}:`, 'Rule violation');
       if (reason === null) return;
-      try {
-        const res = await adminFetch('/api/admin/ban', {
-          method: 'POST',
-          body: JSON.stringify({ userId, reason })
-        });
-        const data = await res.json();
-        if (res.ok) { adminToast(`🔨 ${username} banned`); loadAdminPlayers(); }
-        else { alert(data.error || 'Failed to ban'); }
-      } catch(e) { alert('Error: ' + e.message); }
+      const res = await adminFetch('/api/admin/ban', { method:'POST', body: JSON.stringify({ userId, reason }) });
+      const data = await res.json();
+      if (res.ok) { adminToast(`🔨 ${username} banned`); loadAdminPlayers(); }
+      else alert(data.error || 'Failed');
     }
 
     async function adminBanWithReason(userId, username) {
-      const reason = document.getElementById('detail-ban-reason')?.value || 'Rule violation';
-      try {
-        const res = await adminFetch('/api/admin/ban', {
-          method: 'POST',
-          body: JSON.stringify({ userId, reason })
-        });
-        const data = await res.json();
-        if (res.ok) { adminToast(`🔨 ${username} banned`); document.querySelector('div[style*="fixed"]')?.remove(); loadAdminPlayers(); }
-        else { alert(data.error || 'Failed to ban'); }
-      } catch(e) { alert('Error: ' + e.message); }
+      const reason = document.getElementById('dp-ban-reason')?.value || 'Rule violation';
+      const res = await adminFetch('/api/admin/ban', { method:'POST', body: JSON.stringify({ userId, reason }) });
+      const data = await res.json();
+      if (res.ok) { adminToast(`🔨 ${username} banned`); document.querySelector('div[style*="position:fixed"][style*="9999999"]')?.remove(); loadAdminPlayers(); }
+      else alert(data.error || 'Failed');
     }
 
     async function adminUnban(userId) {
-      try {
-        const res = await adminFetch('/api/admin/unban', {
-          method: 'POST',
-          body: JSON.stringify({ userId })
-        });
-        const data = await res.json();
-        if (res.ok) { adminToast('✅ Player unbanned'); loadAdminPlayers(); }
-        else { alert(data.error || 'Failed to unban'); }
-      } catch(e) { alert('Error: ' + e.message); }
+      const res = await adminFetch('/api/admin/unban', { method:'POST', body: JSON.stringify({ userId }) });
+      const data = await res.json();
+      if (res.ok) { adminToast('✅ Player unbanned'); loadAdminPlayers(); }
+      else alert(data.error || 'Failed');
+    }
+
+    function adminKick(playerId, username) {
+      const reason = prompt(`Kick reason for ${username}:`, 'Kicked by admin');
+      if (reason === null) return;
+      socket.emit('admin-kick-player', { playerId, reason });
+      adminToast(`⚡ ${username} kicked`);
+    }
+
+    async function adminToggleMute(userId, username) {
+      const muted = confirm(`Mute ${username}? (Cancel = Unmute)`);
+      const res = await adminFetch('/api/admin/mute', { method:'POST', body: JSON.stringify({ userId, muted }) });
+      const data = await res.json();
+      if (res.ok) adminToast(`${muted?'🔇 Muted':'🔊 Unmuted'}: ${username}`);
+      else alert(data.error || 'Failed');
     }
 
     async function adminMakeAdmin(userId, username) {
-      if (!confirm(`Make ${username} an admin? This cannot be undone easily.`)) return;
-      try {
-        const res = await adminFetch(`/api/admin/make-admin/${userId}`, { method: 'POST' });
-        const data = await res.json();
-        if (res.ok) { adminToast(`👑 ${username} is now an admin`); loadAdminPlayers(); }
-        else { alert(data.error || 'Failed'); }
-      } catch(e) { alert('Error: ' + e.message); }
+      if (!confirm(`Make ${username} an admin?`)) return;
+      const res = await adminFetch(`/api/admin/make-admin/${userId}`, { method:'POST' });
+      const data = await res.json();
+      if (res.ok) { adminToast(`👑 ${username} is now admin`); loadAdminPlayers(); }
+      else alert(data.error || 'Failed');
+    }
+
+    async function adminAddByUsername() {
+      const username = adminInput('admin-new-admin-username');
+      if (!username) { alert('Enter a username'); return; }
+      // Find user first
+      const res = await adminFetch(`/api/admin/users?search=${encodeURIComponent(username)}`);
+      const data = await res.json();
+      const user = data.users?.find(u => u.username.toLowerCase() === username.toLowerCase());
+      if (!user) { alert('User not found'); return; }
+      await adminMakeAdmin(user._id, user.username);
+      document.getElementById('admin-new-admin-username').value = '';
     }
 
     async function adminResetStats(userId, username) {
-      if (!confirm(`Reset ALL stats for ${username}? This cannot be undone.`)) return;
-      try {
-        const res = await adminFetch('/api/admin/reset-stats', {
-          method: 'POST',
-          body: JSON.stringify({ userId })
-        });
-        const data = await res.json();
-        if (res.ok) { adminToast(`🔄 Stats reset for ${username}`); }
-        else { alert(data.error || 'Failed'); }
-      } catch(e) { alert('Error: ' + e.message); }
+      if (!confirm(`Reset ALL stats for ${username}? Cannot be undone.`)) return;
+      const res = await adminFetch('/api/admin/reset-stats', { method:'POST', body: JSON.stringify({ userId }) });
+      const data = await res.json();
+      if (res.ok) adminToast(`🔄 Stats reset for ${username}`);
+      else alert(data.error || 'Failed');
     }
 
-    // ── GIVE COINS (tab form) ─────────────────────────────
+    // ── COINS ──────────────────────────────────────────
     async function givePlayerCoins() {
-      const username = document.getElementById('admin-coins-username').value.trim();
-      const amount   = parseInt(document.getElementById('admin-coins-amount').value);
-      if (!username || !amount || amount < 1) { alert('Enter a valid username and amount'); return; }
+      const username = adminInput('admin-coins-username');
+      const amount   = parseInt(adminInput('admin-coins-amount'));
+      if (!username || !amount || amount < 1) { alert('Enter username and amount'); return; }
+      const res  = await adminFetch('/api/admin/give-coins', { method:'POST', body: JSON.stringify({ username, amount }) });
+      const data = await res.json();
+      if (res.ok) { adminToast(`✅ Gave ${amount} coins to ${username}`); document.getElementById('admin-coins-username').value=''; document.getElementById('admin-coins-amount').value=''; }
+      else alert(data.error || 'Failed');
+    }
+
+    async function adminRemoveCoins() {
+      const username = adminInput('admin-coins-username');
+      const amount   = parseInt(adminInput('admin-coins-amount'));
+      if (!username || !amount || amount < 1) { alert('Enter username and amount'); return; }
+      const res  = await adminFetch('/api/admin/remove-coins', { method:'POST', body: JSON.stringify({ username, amount }) });
+      const data = await res.json();
+      if (res.ok) { adminToast(`💸 Removed ${amount} coins from ${username}`); }
+      else alert(data.error || 'Failed');
+    }
+
+    async function adminGiveCoinsById(userId, username) {
+      const amount = parseInt(document.getElementById('dp-coins')?.value);
+      if (!amount || amount < 1) { alert('Enter a valid amount'); return; }
+      const res = await adminFetch('/api/admin/give-coins', { method:'POST', body: JSON.stringify({ userId, amount }) });
+      const data = await res.json();
+      if (res.ok) adminToast(`✅ Gave ${amount} coins to ${username}`);
+      else alert(data.error || 'Failed');
+    }
+
+    async function adminRemoveCoinsById(userId, username) {
+      const amount = parseInt(document.getElementById('dp-coins')?.value);
+      if (!amount || amount < 1) { alert('Enter a valid amount'); return; }
+      const res = await adminFetch('/api/admin/remove-coins', { method:'POST', body: JSON.stringify({ userId, amount }) });
+      const data = await res.json();
+      if (res.ok) adminToast(`💸 Removed ${amount} coins from ${username}`);
+      else alert(data.error || 'Failed');
+    }
+
+    // ── SKINS ──────────────────────────────────────────
+    async function adminGiveSkin(remove) {
+      const username = adminInput('admin-skin-username');
+      const skinId   = document.getElementById('admin-skin-id')?.value;
+      if (!username || !skinId) { alert('Enter username and select skin'); return; }
+      const res  = await adminFetch('/api/admin/give-skin', { method:'POST', body: JSON.stringify({ username, skinId, remove }) });
+      const data = await res.json();
+      if (res.ok) adminToast(remove ? `🗑️ Removed ${skinId} from ${username}` : `🎁 Gave ${skinId} to ${username}`);
+      else alert(data.error || 'Failed');
+    }
+
+    // ── GAMES ──────────────────────────────────────────
+    function adminRefreshGames() {
+      socket.emit('admin-get-games');
+    }
+
+    socket.on && socket.on('admin-games-list', (data) => {
+      const statsRow = document.getElementById('admin-stats-row');
+      const list     = document.getElementById('admin-games-list');
+      if (!statsRow || !list) return;
+      statsRow.innerHTML = [
+        ['🎮 Active Games', data.games.length],
+        ['👥 Players In Games', data.games.reduce((a,g)=>a+g.playerCount,0)],
+        ['▶️ Playing', data.games.filter(g=>g.state==='playing').length]
+      ].map(([l,v])=>`
+        <div style="background:#111118;border-radius:8px;padding:14px;text-align:center;border:1px solid #1e1e2e;">
+          <div style="font-size:22px;font-weight:bold;color:white;">${v}</div>
+          <div style="font-size:12px;color:#555;margin-top:3px;">${l}</div>
+        </div>`).join('');
+      if (!data.games.length) { list.innerHTML = '<p style="color:#555;padding:20px;">No active games</p>'; return; }
+      list.innerHTML = data.games.map(g=>`
+        <div style="background:#111118;padding:14px 16px;border-radius:8px;margin-bottom:8px;border:1px solid #1e1e2e;color:white;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <span style="font-weight:bold;">Code: ${g.code}</span>
+              <span style="color:#555;font-size:12px;margin-left:10px;">${g.state} · ${g.playerCount} players</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="adminJoinGame('${g.id}')" style="background:#667eea;color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🎮 Join</button>
+              <button onclick="adminForceEndGame('${g.id}')" style="background:#ef4444;color:white;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">⛔ Force End</button>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#555;">${g.players.map(p=>`${p.username}${p.isAlive?'':'💀'}`).join(', ')}</div>
+        </div>`).join('');
+    });
+
+    function adminJoinGame(gameId) {
+      socket.emit('admin-join-game', { gameId });
+      closeAdminPanel();
+    }
+
+    function adminForceEndGame(gameId) {
+      if (!confirm('Force end this game?')) return;
+      socket.emit('admin-force-end-game', { gameId });
+      adminToast('⛔ Game ended');
+      setTimeout(() => adminRefreshGames(), 1000);
+    }
+
+    // ── GOD MODE ───────────────────────────────────────
+    function adminToggleGodMode() {
+      _adminGodMode = !_adminGodMode;
+      socket.emit('admin-god-mode', { enabled: _adminGodMode });
+      document.getElementById('admin-godmode-indicator').style.display = _adminGodMode ? 'block' : 'none';
+      adminToast(_adminGodMode ? '⚡ God Mode ON' : '⚡ God Mode OFF');
+    }
+
+    // ── BROADCAST ──────────────────────────────────────
+    function sendAdminBroadcast() {
+      const msg = adminInput('admin-broadcast-message');
+      if (!msg) { alert('Enter a message'); return; }
+      socket.emit('admin-broadcast', { message: msg });
+      adminToast('📢 Broadcast sent!');
+      document.getElementById('admin-broadcast-message').value = '';
+    }
+
+    // ── NEWS ───────────────────────────────────────────
+    async function adminPostNews() {
+      const title = adminInput('admin-news-title');
+      const body  = adminInput('admin-news-body');
+      const type  = document.getElementById('admin-news-type')?.value || 'update';
+      if (!title || !body) { alert('Enter title and content'); return; }
+      const res  = await adminFetch('/api/admin/news', { method:'POST', body: JSON.stringify({ title, body, type }) });
+      const data = await res.json();
+      if (res.ok) {
+        adminToast('📰 News posted!');
+        document.getElementById('admin-news-title').value = '';
+        document.getElementById('admin-news-body').value  = '';
+        adminLoadNews();
+      } else alert(data.error || 'Failed');
+    }
+
+    async function adminLoadNews() {
+      const list = document.getElementById('admin-news-list');
+      if (!list) return;
       try {
-        const res  = await adminFetch('/api/admin/give-coins', {
-          method: 'POST',
-          body: JSON.stringify({ username, amount })
-        });
+        const res  = await adminFetch('/api/admin/news');
         const data = await res.json();
-        if (res.ok) {
-          adminToast(`✅ Gave ${amount} coins to ${username}`);
-          document.getElementById('admin-coins-username').value = '';
-          document.getElementById('admin-coins-amount').value   = '';
-        } else { alert(data.error || 'Failed'); }
-      } catch(e) { alert('Error: ' + e.message); }
+        if (!data.news?.length) { list.innerHTML = '<p style="color:#555;">No news posted yet</p>'; return; }
+        const typeEmoji = { update:'🔧', event:'🎉', maintenance:'⚠️', season:'🌟' };
+        list.innerHTML = data.news.map(n => `
+          <div style="background:#111118;padding:14px;border-radius:8px;margin-bottom:8px;border:1px solid #1e1e2e;color:white;display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-weight:bold;margin-bottom:4px;">${typeEmoji[n.type]||'📰'} ${n.title}</div>
+              <div style="font-size:13px;color:#888;">${n.body}</div>
+              <div style="font-size:11px;color:#444;margin-top:4px;">${new Date(n.createdAt).toLocaleString()}</div>
+            </div>
+            <button onclick="adminDeleteNews(${n.id})" style="background:#ef4444;color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;flex-shrink:0;margin-left:10px;">🗑️</button>
+          </div>`).join('');
+      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load news</p>'; }
     }
 
-    // ── BROADCAST TAB ────────────────────────────────────
-    async function sendAdminBroadcast() {
-      const message = document.getElementById('admin-broadcast-message').value.trim();
-      if (!message) { alert('Enter a message'); return; }
-      try {
-        socket.emit('admin-broadcast', { message });
-        adminToast('📢 Broadcast sent!');
-        document.getElementById('admin-broadcast-message').value = '';
-      } catch(e) { alert('Error: ' + e.message); }
+    async function adminDeleteNews(id) {
+      const res = await adminFetch(`/api/admin/news/${id}`, { method:'DELETE' });
+      if (res.ok) { adminToast('🗑️ Deleted'); adminLoadNews(); }
     }
 
-    // ── GAMES TAB ────────────────────────────────────────
-    async function loadAdminGames() {
-      const list = document.getElementById('admin-games-list');
-      try {
-        const res  = await adminFetch('/api/admin/stats');
-        const data = await res.json();
-        if (!res.ok) { list.innerHTML = `<p style="color:#f87171;">${data.error}</p>`; return; }
-        list.innerHTML = `
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
-            ${[
-              ['👥 Total Players', data.totalPlayers],
-              ['🟢 Online Now',    data.onlinePlayers],
-              ['🎮 Active Games',  data.activeGames]
-            ].map(([l,v])=>`
-              <div style="background:#1a1a2e;border-radius:10px;padding:16px;text-align:center;border:1px solid #333;">
-                <div style="font-size:28px;font-weight:bold;color:white;">${v ?? '–'}</div>
-                <div style="font-size:13px;color:#888;margin-top:4px;">${l}</div>
-              </div>`).join('')}
-          </div>`;
-      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load stats</p>'; }
-    }
-
-    // ── STATS TAB ────────────────────────────────────────
-    async function loadAdminStats() { await loadAdminGames(); }
-
-    // ── TOAST ─────────────────────────────────────────────
+    // ── TOAST ──────────────────────────────────────────
     function adminToast(msg) {
       const t = document.createElement('div');
-      t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border:1px solid #667eea;padding:12px 24px;border-radius:10px;font-weight:600;font-size:14px;z-index:9999999;';
+      t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1e1e2e;color:white;border:1px solid #667eea;padding:11px 22px;border-radius:10px;font-weight:600;font-size:13px;z-index:9999999;white-space:nowrap;';
       t.textContent = msg;
       document.body.appendChild(t);
-      setTimeout(() => t.remove(), 2500);
+      setTimeout(()=>t.remove(), 2500);
     }
 
         // admin-message listener is registered in setupGameSockets() below

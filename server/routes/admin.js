@@ -310,5 +310,104 @@ router.post('/event/create', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+
+// ========== GET ACTIVE GAMES ==========
+router.get('/games', authenticate, requireAdmin, async (req, res) => {
+  try {
+    // games map is in index.js — expose via global or return from socket
+    // For now return a placeholder that socket will fill
+    res.json({ games: [] });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching games' });
+  }
+});
+
+// ========== GIVE/REMOVE SKIN ==========
+router.post('/give-skin', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { username, skinId, remove } = req.body;
+    const user = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (remove) {
+      user.inventory.ownedSkins = user.inventory.ownedSkins.filter(s => s !== skinId);
+      if (user.inventory.equippedSkin === skinId) user.inventory.equippedSkin = 'default';
+    } else {
+      if (!user.inventory.ownedSkins.includes(skinId)) {
+        user.inventory.ownedSkins.push(skinId);
+      }
+    }
+    await user.save();
+    res.json({ message: `Skin ${skinId} ${remove ? 'removed from' : 'given to'} ${user.username}`, inventory: user.inventory });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating skin' });
+  }
+});
+
+// ========== REMOVE COINS ==========
+router.post('/remove-coins', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { username, userId, amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    const user = userId
+      ? await User.findById(userId)
+      : await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.stats.coins = Math.max(0, user.stats.coins - parseInt(amount));
+    await user.save();
+    res.json({ message: `Removed ${amount} coins from ${user.username}`, newBalance: user.stats.coins });
+  } catch (error) {
+    res.status(500).json({ error: 'Error removing coins' });
+  }
+});
+
+// ========== MUTE / UNMUTE ==========
+router.post('/mute', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { userId, muted } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.settings.chatEnabled = !muted;
+    user.markModified('settings');
+    await user.save();
+    res.json({ message: `${user.username} ${muted ? 'muted' : 'unmuted'}` });
+  } catch (error) {
+    res.status(500).json({ error: 'Error muting user' });
+  }
+});
+
+// ========== NEWS MANAGEMENT ==========
+// Simple in-memory news store (persists while server runs)
+const newsItems = [];
+
+router.get('/news', async (req, res) => {
+  res.json({ news: newsItems.slice(0, 10) });
+});
+
+router.post('/news', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { title, body, type } = req.body;
+    if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
+    const item = { id: Date.now(), title, body, type: type || 'update', createdAt: new Date().toISOString() };
+    newsItems.unshift(item);
+    if (newsItems.length > 20) newsItems.pop();
+    res.json({ message: 'News posted', item });
+  } catch (error) {
+    res.status(500).json({ error: 'Error posting news' });
+  }
+});
+
+router.delete('/news/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const idx = newsItems.findIndex(n => n.id === parseInt(req.params.id));
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    newsItems.splice(idx, 1);
+    res.json({ message: 'News deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting news' });
+  }
+});
+
 module.exports = router;
+module.exports.newsItems = newsItems;
 module.exports.requireAdmin = requireAdmin;
