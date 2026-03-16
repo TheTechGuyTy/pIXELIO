@@ -5432,200 +5432,295 @@
     });
     
     // ========== ADMIN PANEL ==========
+    // ========== ADMIN PANEL ==========
+    function adminFetch(path, options = {}) {
+      return fetch(path, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        }
+      });
+    }
+
     function openAdminPanel() {
-      // Double check admin status
       if (!currentUser || !currentUser.isAdmin) {
-        alert('❌ Access Denied: Admin privileges required');
+        alert('❌ Access Denied');
         return;
       }
-      
       document.getElementById('admin-panel').style.display = 'block';
-      loadAdminData();
+      switchAdminTab('players');
     }
-    
+
     function closeAdminPanel() {
       document.getElementById('admin-panel').style.display = 'none';
     }
-    
+
     function switchAdminTab(tabName) {
-      // Update tab buttons
       document.querySelectorAll('.admin-tab').forEach(tab => {
         tab.classList.remove('active');
         tab.style.borderBottomColor = 'transparent';
       });
-      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-      document.querySelector(`[data-tab="${tabName}"]`).style.borderBottomColor = '#667eea';
-      
-      // Update content
-      document.querySelectorAll('.admin-tab-content').forEach(content => {
-        content.style.display = 'none';
-      });
-      document.getElementById(`admin-tab-${tabName}`).style.display = 'block';
-      
-      // Load data for tab
-      if (tabName === 'players') loadAdminPlayers();
-      if (tabName === 'games') loadAdminGames();
-    }
-    
-    async function loadAdminData() {
-      await loadAdminPlayers();
-    }
-    
-    async function loadAdminPlayers() {
-      try {
-        const response = await fetch('/api/admin/users', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          displayAdminPlayers(data.users);
-        }
-      } catch (error) {
-        console.error('Error loading players:', error);
+      const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+      if (activeTab) {
+        activeTab.classList.add('active');
+        activeTab.style.borderBottomColor = '#667eea';
       }
+      document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById(`admin-tab-${tabName}`).style.display = 'block';
+
+      if (tabName === 'players') loadAdminPlayers();
+      if (tabName === 'games')   loadAdminGames();
+      if (tabName === 'stats')   loadAdminStats();
     }
-    
-    function displayAdminPlayers(users) {
+
+    // ── PLAYERS TAB ──────────────────────────────────────
+    async function loadAdminPlayers(search = '') {
+      const list = document.getElementById('admin-players-list');
+      list.innerHTML = '<p style="color:#888;">Loading...</p>';
+      try {
+        const res = await adminFetch(`/api/admin/users?limit=50&search=${encodeURIComponent(search)}`);
+        const data = await res.json();
+        if (!res.ok) { list.innerHTML = `<p style="color:#f87171;">${data.error}</p>`; return; }
+        renderAdminPlayers(data.users);
+      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load players</p>'; }
+    }
+
+    function renderAdminPlayers(users) {
       const list = document.getElementById('admin-players-list');
       if (!users || users.length === 0) {
-        list.innerHTML = '<p style="color: #888;">No players found</p>';
+        list.innerHTML = '<p style="color:#888;">No players found</p>';
         return;
       }
-      
-      list.innerHTML = users.map(user => `
-        <div style="background: #222; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+      list.innerHTML = users.map(u => `
+        <div style="background:#1a1a2e;padding:14px 16px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #333;">
           <div>
-            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">${user.username}</div>
-            <div style="font-size: 12px; color: #888;">
-              Coins: ${user.stats?.coins || 0} | 
-              Games: ${user.stats?.gamesPlayed || 0} | 
-              Wins: ${user.stats?.wins || 0} |
-              Banned: ${user.banned ? '✅ Yes' : '❌ No'}
+            <div style="font-size:15px;font-weight:600;color:white;margin-bottom:3px;">
+              ${u.username}
+              ${u.isAdmin ? '<span style="background:#667eea;color:white;font-size:11px;padding:2px 7px;border-radius:4px;margin-left:6px;">ADMIN</span>' : ''}
+              ${u.isBanned ? '<span style="background:#ef4444;color:white;font-size:11px;padding:2px 7px;border-radius:4px;margin-left:6px;">BANNED</span>' : ''}
+            </div>
+            <div style="font-size:12px;color:#888;">
+              Level ${u.stats?.level || 1} &nbsp;|&nbsp; ${u.isOnline ? '🟢 Online' : '⚫ Offline'}
             </div>
           </div>
-          <div style="display: flex; gap: 10px;">
-            ${user.banned 
-              ? `<button onclick="unbanPlayer('${user._id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;">Unban</button>`
-              : `<button onclick="banPlayer('${user._id}')" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;">Ban</button>`
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            <button onclick="openPlayerDetail('${u._id}','${u.username}')"
+              style="background:#667eea;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
+              View
+            </button>
+            ${u.isBanned
+              ? `<button onclick="adminUnban('${u._id}')" style="background:#10b981;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Unban</button>`
+              : `<button onclick="adminBan('${u._id}','${u.username}')" style="background:#ef4444;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Ban</button>`
             }
+            ${!u.isAdmin ? `<button onclick="adminMakeAdmin('${u._id}','${u.username}')" style="background:#f59e0b;color:white;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Make Admin</button>` : ''}
           </div>
         </div>
       `).join('');
     }
-    
+
     function searchAdminPlayers() {
-      const searchTerm = document.getElementById('admin-player-search').value.toLowerCase();
-      const playerDivs = document.querySelectorAll('#admin-players-list > div');
-      
-      playerDivs.forEach(div => {
-        const username = div.querySelector('div > div').textContent.toLowerCase();
-        div.style.display = username.includes(searchTerm) ? 'flex' : 'none';
-      });
+      const q = document.getElementById('admin-player-search').value;
+      loadAdminPlayers(q);
     }
-    
-    async function banPlayer(userId) {
-      if (!confirm('Are you sure you want to ban this player?')) return;
-      
+
+    async function openPlayerDetail(userId, username) {
       try {
-        const response = await fetch('/api/admin/ban-user', {
+        const res = await adminFetch(`/api/admin/user/${userId}`);
+        const data = await res.json();
+        if (!res.ok) { alert(data.error); return; }
+        const u = data.user;
+        const wins = u.stats?.wins ?? 0;
+        const games = u.stats?.gamesPlayed ?? 0;
+        const kills = u.stats?.kills ?? 0;
+        const coins = u.stats?.coins ?? 0;
+        const level = u.stats?.level ?? 1;
+        const winRate = games > 0 ? ((wins/games)*100).toFixed(1) : '0.0';
+
+        const detail = document.createElement('div');
+        detail.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:9999999;display:flex;align-items:center;justify-content:center;';
+        detail.innerHTML = `
+          <div style="background:#1a1a2e;border-radius:16px;padding:28px;max-width:480px;width:90%;color:white;border:1px solid #333;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <div style="font-size:22px;font-weight:bold;">${u.username}</div>
+              <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+              ${[['Level',level],['Coins',coins.toLocaleString()],['Wins',wins],['Win Rate',winRate+'%'],['Kills',kills],['Games',games]].map(([l,v])=>`
+                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:center;">
+                  <div style="font-size:20px;font-weight:bold;">${v}</div>
+                  <div style="font-size:12px;color:#888;margin-top:2px;">${l}</div>
+                </div>`).join('')}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;gap:8px;">
+                <input id="detail-coins-amt" type="number" min="1" placeholder="Coins amount"
+                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #333;background:#111;color:white;font-size:14px;">
+                <button onclick="adminGiveCoinsById('${u._id}','${u.username}')"
+                  style="background:#f59e0b;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
+                  💰 Give Coins
+                </button>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <input id="detail-ban-reason" type="text" placeholder="Ban reason (optional)"
+                  style="flex:1;padding:9px;border-radius:6px;border:1px solid #333;background:#111;color:white;font-size:14px;">
+                <button onclick="adminBanWithReason('${u._id}','${u.username}')"
+                  style="background:#ef4444;color:white;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
+                  🔨 Ban
+                </button>
+              </div>
+              <button onclick="adminResetStats('${u._id}','${u.username}')"
+                style="background:#374151;color:white;border:none;padding:9px;border-radius:6px;cursor:pointer;font-size:13px;">
+                🔄 Reset Stats
+              </button>
+            </div>
+          </div>`;
+        document.body.appendChild(detail);
+      } catch(e) { alert('Failed to load player details'); }
+    }
+
+    async function adminGiveCoinsById(userId, username) {
+      const amount = parseInt(document.getElementById('detail-coins-amt')?.value);
+      if (!amount || amount < 1) { alert('Enter a valid amount'); return; }
+      try {
+        const res = await adminFetch('/api/admin/give-coins', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
+          body: JSON.stringify({ userId, amount })
+        });
+        const data = await res.json();
+        if (res.ok) { adminToast(`✅ Gave ${amount} coins to ${username}`); }
+        else { alert(data.error || 'Failed'); }
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function adminBan(userId, username) {
+      const reason = prompt(`Ban reason for ${username}:`, 'Rule violation');
+      if (reason === null) return;
+      try {
+        const res = await adminFetch('/api/admin/ban', {
+          method: 'POST',
+          body: JSON.stringify({ userId, reason })
+        });
+        const data = await res.json();
+        if (res.ok) { adminToast(`🔨 ${username} banned`); loadAdminPlayers(); }
+        else { alert(data.error || 'Failed to ban'); }
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function adminBanWithReason(userId, username) {
+      const reason = document.getElementById('detail-ban-reason')?.value || 'Rule violation';
+      try {
+        const res = await adminFetch('/api/admin/ban', {
+          method: 'POST',
+          body: JSON.stringify({ userId, reason })
+        });
+        const data = await res.json();
+        if (res.ok) { adminToast(`🔨 ${username} banned`); document.querySelector('div[style*="fixed"]')?.remove(); loadAdminPlayers(); }
+        else { alert(data.error || 'Failed to ban'); }
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function adminUnban(userId) {
+      try {
+        const res = await adminFetch('/api/admin/unban', {
+          method: 'POST',
           body: JSON.stringify({ userId })
         });
-        
-        const data = await response.json();
-        if (data.success) {
-          alert('Player banned successfully!');
-          loadAdminPlayers();
-        } else {
-          alert('Failed to ban player: ' + data.message);
-        }
-      } catch (error) {
-        alert('Error banning player: ' + error.message);
-      }
+        const data = await res.json();
+        if (res.ok) { adminToast('✅ Player unbanned'); loadAdminPlayers(); }
+        else { alert(data.error || 'Failed to unban'); }
+      } catch(e) { alert('Error: ' + e.message); }
     }
-    
-    async function unbanPlayer(userId) {
+
+    async function adminMakeAdmin(userId, username) {
+      if (!confirm(`Make ${username} an admin? This cannot be undone easily.`)) return;
       try {
-        const response = await fetch('/api/admin/unban-user', {
+        const res = await adminFetch(`/api/admin/make-admin/${userId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) { adminToast(`👑 ${username} is now an admin`); loadAdminPlayers(); }
+        else { alert(data.error || 'Failed'); }
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function adminResetStats(userId, username) {
+      if (!confirm(`Reset ALL stats for ${username}? This cannot be undone.`)) return;
+      try {
+        const res = await adminFetch('/api/admin/reset-stats', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
           body: JSON.stringify({ userId })
         });
-        
-        const data = await response.json();
-        if (data.success) {
-          alert('Player unbanned successfully!');
-          loadAdminPlayers();
-        } else {
-          alert('Failed to unban player: ' + data.message);
-        }
-      } catch (error) {
-        alert('Error unbanning player: ' + error.message);
-      }
+        const data = await res.json();
+        if (res.ok) { adminToast(`🔄 Stats reset for ${username}`); }
+        else { alert(data.error || 'Failed'); }
+      } catch(e) { alert('Error: ' + e.message); }
     }
-    
-    async function loadAdminGames() {
-      // TODO: Implement active games list
-      document.getElementById('admin-games-list').innerHTML = '<p style="color: #888;">Active games feature coming soon...</p>';
-    }
-    
-    async function sendAdminBroadcast() {
-      const message = document.getElementById('admin-broadcast-message').value.trim();
-      if (!message) {
-        alert('Please enter a message!');
-        return;
-      }
-      
-      try {
-        socket.emit('admin-broadcast', { message });
-        alert('Message sent to all players!');
-        document.getElementById('admin-broadcast-message').value = '';
-      } catch (error) {
-        alert('Error sending message: ' + error.message);
-      }
-    }
-    
+
+    // ── GIVE COINS (tab form) ─────────────────────────────
     async function givePlayerCoins() {
       const username = document.getElementById('admin-coins-username').value.trim();
-      const amount = parseInt(document.getElementById('admin-coins-amount').value);
-      
-      if (!username || !amount || amount < 1) {
-        alert('Please enter a valid username and amount!');
-        return;
-      }
-      
+      const amount   = parseInt(document.getElementById('admin-coins-amount').value);
+      if (!username || !amount || amount < 1) { alert('Enter a valid username and amount'); return; }
       try {
-        const response = await fetch('/api/admin/give-coins', {
+        const res  = await adminFetch('/api/admin/give-coins', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
           body: JSON.stringify({ username, amount })
         });
-        
-        const data = await response.json();
-        if (data.success) {
-          alert(`Successfully gave ${amount} coins to ${username}!`);
+        const data = await res.json();
+        if (res.ok) {
+          adminToast(`✅ Gave ${amount} coins to ${username}`);
           document.getElementById('admin-coins-username').value = '';
-          document.getElementById('admin-coins-amount').value = '';
-        } else {
-          alert('Failed to give coins: ' + data.message);
-        }
-      } catch (error) {
-        alert('Error giving coins: ' + error.message);
-      }
+          document.getElementById('admin-coins-amount').value   = '';
+        } else { alert(data.error || 'Failed'); }
+      } catch(e) { alert('Error: ' + e.message); }
     }
-    
-    // admin-message listener is registered in setupGameSockets() below
+
+    // ── BROADCAST TAB ────────────────────────────────────
+    async function sendAdminBroadcast() {
+      const message = document.getElementById('admin-broadcast-message').value.trim();
+      if (!message) { alert('Enter a message'); return; }
+      try {
+        socket.emit('admin-broadcast', { message });
+        adminToast('📢 Broadcast sent!');
+        document.getElementById('admin-broadcast-message').value = '';
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    // ── GAMES TAB ────────────────────────────────────────
+    async function loadAdminGames() {
+      const list = document.getElementById('admin-games-list');
+      try {
+        const res  = await adminFetch('/api/admin/stats');
+        const data = await res.json();
+        if (!res.ok) { list.innerHTML = `<p style="color:#f87171;">${data.error}</p>`; return; }
+        list.innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+            ${[
+              ['👥 Total Players', data.totalPlayers],
+              ['🟢 Online Now',    data.onlinePlayers],
+              ['🎮 Active Games',  data.activeGames]
+            ].map(([l,v])=>`
+              <div style="background:#1a1a2e;border-radius:10px;padding:16px;text-align:center;border:1px solid #333;">
+                <div style="font-size:28px;font-weight:bold;color:white;">${v ?? '–'}</div>
+                <div style="font-size:13px;color:#888;margin-top:4px;">${l}</div>
+              </div>`).join('')}
+          </div>`;
+      } catch(e) { list.innerHTML = '<p style="color:#f87171;">Failed to load stats</p>'; }
+    }
+
+    // ── STATS TAB ────────────────────────────────────────
+    async function loadAdminStats() { await loadAdminGames(); }
+
+    // ── TOAST ─────────────────────────────────────────────
+    function adminToast(msg) {
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border:1px solid #667eea;padding:12px 24px;border-radius:10px;font-weight:600;font-size:14px;z-index:9999999;';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2500);
+    }
+
+        // admin-message listener is registered in setupGameSockets() below
     
     // ========== MAP STUDIO ==========
     let studioEngine = null;

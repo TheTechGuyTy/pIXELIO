@@ -166,19 +166,22 @@ router.get('/user/:userId', authenticate, requireAdmin, async (req, res) => {
 // ========== GIVE COINS (ADMIN) ==========
 router.post('/give-coins', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { userId, amount } = req.body;
+    const { userId, username, amount } = req.body;
     
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
     
-    const user = await User.findById(userId);
+    // Find by userId or username
+    const user = userId
+      ? await User.findById(userId)
+      : await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    user.stats.coins += amount;
+    user.stats.coins += parseInt(amount);
     await user.save();
     
     res.json({
