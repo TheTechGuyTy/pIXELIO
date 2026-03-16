@@ -3086,6 +3086,7 @@
           currentSettings = { ...currentSettings, ...JSON.parse(saved) };
         }
         updateSettingsUI();
+        applySettings();
         return;
       }
       
@@ -3098,6 +3099,7 @@
         if (data.settings) {
           currentSettings = { ...currentSettings, ...data.settings };
           updateSettingsUI();
+          applySettings();
         }
       } catch (error) {
         console.error('Load settings error:', error);
@@ -3343,22 +3345,96 @@
     }
     
     function applySettings() {
-      // Apply audio settings
-      if (window.audioContext) {
-        // TODO: Apply audio settings to game
-      }
-      
-      // Apply graphics settings
+      // === VOLUME ===
+      // Store on window so game audio can read it
+      window._masterVolume = currentSettings.masterVolume ?? 0.7;
+      window._musicVolume  = currentSettings.musicVolume  ?? 0.5;
+      window._sfxVolume    = currentSettings.sfxVolume    ?? 0.7;
+
+      // Apply to any existing audio elements
+      document.querySelectorAll('audio').forEach(a => {
+        a.volume = window._masterVolume;
+      });
+
+      // === FPS COUNTER ===
+      let fpsEl = document.getElementById('fps-counter-overlay');
       if (currentSettings.showFPS) {
-        // TODO: Show FPS counter
+        if (!fpsEl) {
+          fpsEl = document.createElement('div');
+          fpsEl.id = 'fps-counter-overlay';
+          fpsEl.style.cssText = 'position:fixed;top:8px;right:12px;z-index:99999;color:#00ff88;font-size:13px;font-family:monospace;font-weight:bold;pointer-events:none;text-shadow:0 0 4px #000;';
+          document.body.appendChild(fpsEl);
+          let lastTime = performance.now();
+          let frames = 0;
+          function countFPS() {
+            frames++;
+            const now = performance.now();
+            if (now - lastTime >= 500) {
+              fpsEl.textContent = `${Math.round(frames * 1000 / (now - lastTime))} FPS`;
+              frames = 0;
+              lastTime = now;
+            }
+            if (currentSettings.showFPS) requestAnimationFrame(countFPS);
+            else if (fpsEl) fpsEl.remove();
+          }
+          requestAnimationFrame(countFPS);
+        }
+      } else if (fpsEl) {
+        fpsEl.remove();
       }
-      
-      // Apply keybinds to game controls
-      if (typeof keys !== 'undefined') {
-        // Keybinds will be read from currentSettings.keybinds
+
+      // === GRAPHICS QUALITY — adjust 3D renderer ===
+      if (game3D && game3D.renderer) {
+        const qualityMap = { low: 0.5, medium: 0.75, high: 1.0, ultra: window.devicePixelRatio };
+        const ratio = qualityMap[currentSettings.graphicsQuality] ?? 1.0;
+        game3D.renderer.setPixelRatio(ratio);
+
+        // Shadow quality
+        const shadowMap = { off: false, low: true, medium: true, high: true };
+        game3D.renderer.shadowMap.enabled = shadowMap[currentSettings.shadowQuality] ?? true;
       }
-      
-      console.log('Settings applied:', currentSettings);
+
+      // === MOUSE SENSITIVITY — feed into prediction speed ===
+      if (game3D) {
+        game3D._speed = 5 * (currentSettings.mouseSensitivity ?? 0.5) * 2;
+      }
+
+      // === KILL FEED visibility ===
+      const killFeedEl = document.getElementById('kill-feed');
+      if (killFeedEl) {
+        killFeedEl.style.display = currentSettings.showKillFeed ? 'block' : 'none';
+      }
+
+      // === CHAT ===
+      const chatEl = document.getElementById('game-chat');
+      if (chatEl && !currentSettings.chatEnabled) {
+        chatEl.style.display = 'none';
+        window._chatOpen = false;
+      }
+
+      // === COLORBLIND MODE ===
+      const cbFilters = {
+        off:          'none',
+        protanopia:   'url(#protanopia)',
+        deuteranopia: 'url(#deuteranopia)',
+        tritanopia:   'url(#tritanopia)'
+      };
+      // Inject SVG filter if not present
+      if (currentSettings.colorblindMode !== 'off' && !document.getElementById('cb-filters')) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.id = 'cb-filters';
+        svg.style.cssText = 'position:absolute;width:0;height:0;';
+        svg.innerHTML = `<defs>
+          <filter id="protanopia"><feColorMatrix type="matrix" values="0.567,0.433,0,0,0 0.558,0.442,0,0,0 0,0.242,0.758,0,0 0,0,0,1,0"/></filter>
+          <filter id="deuteranopia"><feColorMatrix type="matrix" values="0.625,0.375,0,0,0 0.7,0.3,0,0,0 0,0.3,0.7,0,0 0,0,0,1,0"/></filter>
+          <filter id="tritanopia"><feColorMatrix type="matrix" values="0.95,0.05,0,0,0 0,0.433,0.567,0,0 0,0.475,0.525,0,0 0,0,0,1,0"/></filter>
+        </defs>`;
+        document.body.appendChild(svg);
+      }
+      const canvas3d = document.getElementById('pixelio-3d-canvas');
+      if (canvas3d) canvas3d.style.filter = cbFilters[currentSettings.colorblindMode] || 'none';
+
+      console.log('✅ Settings applied');
     }
 
     // ========== GAME FUNCTIONS (simplified for now) ==========
@@ -3951,6 +4027,9 @@
           game3D.setMyPlayer(socket.id, gameState.map.size);
           game3D.createBuildings(gameState.buildings, gameState.map.size);
           console.log('✅ 3D Engine started!');
+
+          // Apply current settings to the new 3D instance
+          applySettings();
         } catch (error) {
           console.error('❌ 3D Error:', error);
           alert('3D Error: ' + error.message);
@@ -6017,18 +6096,30 @@
     
     
     
+    // ========== AVATAR DEFINITIONS ==========
+    const AVATARS = [
+      { id: 'bot',    name: 'Bot',        price: 0,    src: '/avatars/bot.svg'    },
+      { id: 'pug',    name: 'Pug',        price: 500,  src: '/avatars/pug.svg'    },
+      { id: 'lava',   name: 'Lava',       price: 600,  src: '/avatars/lava.svg'   },
+      { id: 'ice',    name: 'Ice',        price: 600,  src: '/avatars/ice.svg'    },
+      { id: 'ocean',  name: 'Ocean',      price: 600,  src: '/avatars/ocean.svg'  },
+      { id: 'neon',   name: 'Neon',       price: 700,  src: '/avatars/neon.svg'   },
+      { id: 'shadow', name: 'Shadow',     price: 700,  src: '/avatars/shadow.svg' },
+      { id: 'cyber',  name: 'Cyber',      price: 800,  src: '/avatars/cyber.svg'  },
+      { id: 'galaxy', name: 'Galaxy',     price: 800,  src: '/avatars/galaxy.svg' },
+      { id: 'golden', name: 'Golden',     price: 1200, src: '/avatars/golden.svg' },
+    ];
+
     // ========== PROFILE SYSTEM ==========
     let _profileIsOwn = false;
 
     const BADGE_DEFS = [
-      { id: 'first_win',      emoji: '🏆', label: 'First Win'         },
-      { id: 'ten_wins',       emoji: '🥇', label: '10 Wins'           },
-      { id: 'fifty_wins',     emoji: '👑', label: '50 Wins'           },
-      { id: 'sharpshooter',   emoji: '🎯', label: 'Sharpshooter'      },
-      { id: 'survivor',       emoji: '🛡️', label: 'Survivor'          },
-      { id: 'social',         emoji: '🤝', label: 'Social Butterfly'  },
-      { id: 'early_adopter',  emoji: '⭐', label: 'Early Adopter'     },
-      { id: 'hundred_games',  emoji: '🎮', label: '100 Games Played'  },
+      { id: 'first_win',     emoji: '🏆', label: 'First Win'        },
+      { id: 'ten_wins',      emoji: '🥇', label: '10 Wins'          },
+      { id: 'fifty_wins',    emoji: '👑', label: '50 Wins'          },
+      { id: 'sharpshooter',  emoji: '🎯', label: 'Sharpshooter'     },
+      { id: 'hundred_games', emoji: '🎮', label: '100 Games Played' },
+      { id: 'early_adopter', emoji: '⭐', label: 'Early Adopter'    },
     ];
 
     async function openProfile(username) {
@@ -6067,10 +6158,24 @@
       document.getElementById('profile-bio-edit').style.display = 'none';
       document.getElementById('edit-bio-btn').style.display = _profileIsOwn ? 'inline-block' : 'none';
 
-      // Profile pic
-      const picEmojis = { default:'🤖', pug:'🐶', star:'⭐', crown:'👑', fire:'🔥', lightning:'⚡', crystal:'💎', galaxy:'🌌' };
-      const picId = data.profile?.profilePic || 'default';
-      document.getElementById('profile-pic-display').textContent = picEmojis[picId] || '🤖';
+      // Profile pic - real SVG image
+      const picId = data.profile?.profilePic || 'bot';
+      const avatarDef = AVATARS.find(a => a.id === picId) || AVATARS[0];
+      const picEl = document.getElementById('profile-pic-display');
+      picEl.src = avatarDef.src;
+
+      // Show change button only on own profile
+      let changeBtn = document.getElementById('profile-pic-change-btn');
+      if (!changeBtn && _profileIsOwn) {
+        changeBtn = document.createElement('button');
+        changeBtn.id = 'profile-pic-change-btn';
+        changeBtn.textContent = '✏️ Change';
+        changeBtn.style.cssText = 'margin-top:8px;padding:5px 12px;background:rgba(255,255,255,0.1);border:none;border-radius:6px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:12px;display:block;width:90px;';
+        changeBtn.onclick = openAvatarPicker;
+        picEl.parentElement.appendChild(changeBtn);
+      } else if (changeBtn) {
+        changeBtn.style.display = _profileIsOwn ? 'block' : 'none';
+      }
 
       // Stats
       document.getElementById('profile-wins').textContent  = data.stats?.wins ?? 0;
@@ -6115,7 +6220,82 @@
       }
     }
 
-    function startBioEdit() {
+    function openAvatarPicker() {
+      // Remove existing picker if any
+      document.getElementById('avatar-picker-modal')?.remove();
+
+      const owned = currentUser?.profile?.ownedProfilePics || ['bot'];
+      const modal = document.createElement('div');
+      modal.id = 'avatar-picker-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:9999999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = `
+        <div style="background:#1a1a2e;border-radius:20px;padding:28px;max-width:520px;width:90%;color:white;font-family:inherit;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div style="font-size:20px;font-weight:bold;">Choose Profile Pic</div>
+            <button onclick="document.getElementById('avatar-picker-modal').remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:24px;cursor:pointer;">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+            ${AVATARS.map(a => {
+              const isOwned = owned.includes(a.id);
+              const isCurrent = (currentUser?.profile?.profilePic || 'bot') === a.id;
+              return `<div onclick="${isOwned ? `equipAvatar('${a.id}')` : `buyAvatar('${a.id}',${a.price})`}"
+                style="cursor:pointer;border-radius:12px;padding:8px;text-align:center;background:${isCurrent ? 'rgba(102,126,234,0.3)' : 'rgba(255,255,255,0.05)'};border:2px solid ${isCurrent ? '#667eea' : 'transparent'};transition:all 0.2s;"
+                onmouseover="this.style.background='rgba(255,255,255,0.12)'"
+                onmouseout="this.style.background='${isCurrent ? 'rgba(102,126,234,0.3)' : 'rgba(255,255,255,0.05)'}'">
+                <img src="${a.src}" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 6px;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.8);">${a.name}</div>
+                <div style="font-size:10px;color:${isOwned ? '#34d399' : '#fbbf24'};">${isOwned ? (isCurrent ? 'Equipped' : 'Owned') : `${a.price > 0 ? a.price+'c' : 'Free'}`}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    async function equipAvatar(avatarId) {
+      try {
+        const res = await fetch('/api/auth/profile/customise', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ profilePic: avatarId })
+        });
+        if (res.ok) {
+          if (!currentUser.profile) currentUser.profile = {};
+          currentUser.profile.profilePic = avatarId;
+          const avatarDef = AVATARS.find(a => a.id === avatarId);
+          document.getElementById('profile-pic-display').src = avatarDef?.src || '/avatars/bot.svg';
+          document.getElementById('avatar-picker-modal')?.remove();
+        }
+      } catch(e) { console.error('Equip avatar error:', e); }
+    }
+
+    async function buyAvatar(avatarId, price) {
+      if (!currentUser || (currentUser.stats?.coins || 0) < price) {
+        alert(`Not enough coins! You need ${price} coins.`);
+        return;
+      }
+      if (!confirm(`Buy this avatar for ${price} coins?`)) return;
+      try {
+        const res = await fetch('/api/shop/purchase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ itemId: avatarId, itemType: 'profilePic' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentUser.stats.coins = data.newBalance;
+          if (!currentUser.profile) currentUser.profile = {};
+          if (!currentUser.profile.ownedProfilePics) currentUser.profile.ownedProfilePics = ['bot'];
+          currentUser.profile.ownedProfilePics.push(avatarId);
+          await equipAvatar(avatarId);
+        } else {
+          const err = await res.json();
+          alert(err.error || 'Purchase failed');
+        }
+      } catch(e) { console.error('Buy avatar error:', e); }
+    }
+
+    
       const bio = document.getElementById('profile-bio-display').textContent;
       document.getElementById('profile-bio-input').value = bio === 'No bio yet — add one!' ? '' : bio;
       document.getElementById('profile-bio-display').style.display = 'none';
@@ -6157,7 +6337,7 @@
       <!-- Header row: pic + name + bio -->
       <div style="display:flex; gap:24px; align-items:flex-start; margin-bottom:28px;">
         <div style="position:relative; flex-shrink:0;">
-          <div id="profile-pic-display" style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:36px;border:3px solid rgba(255,255,255,0.2);">🤖</div>
+          <img id="profile-pic-display" src="/avatars/bot.svg" width="90" height="90" style="border-radius:50%;border:3px solid rgba(255,255,255,0.2);object-fit:cover;">
         </div>
         <div style="flex:1; min-width:0;">
           <div id="profile-username" style="font-size:26px;font-weight:bold;margin-bottom:4px;"></div>

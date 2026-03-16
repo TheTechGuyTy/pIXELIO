@@ -196,6 +196,26 @@ router.post('/purchase', authenticate, async (req, res) => {
       
       user.stats.coins -= price;
       
+    } else if (itemType === 'profilePic') {
+      const AVATAR_PRICES = { bot:0, pug:500, lava:600, ice:600, ocean:600, neon:700, shadow:700, cyber:800, galaxy:800, golden:1200 };
+      price = AVATAR_PRICES[itemId];
+      if (price === undefined) return res.status(404).json({ error: 'Avatar not found' });
+      itemName = `${itemId} avatar`;
+
+      if (!user.profile) user.profile = { bio:'', profilePic:'bot', ownedProfilePics:['bot'] };
+      if (!user.profile.ownedProfilePics) user.profile.ownedProfilePics = ['bot'];
+
+      if (user.profile.ownedProfilePics.includes(itemId)) {
+        return res.status(400).json({ error: 'Already owned' });
+      }
+      if (user.stats.coins < price) {
+        return res.status(400).json({ error: 'Not enough coins' });
+      }
+
+      user.profile.ownedProfilePics.push(itemId);
+      user.stats.coins -= price;
+      user.markModified('profile');
+
     } else {
       return res.status(400).json({ error: 'Invalid item type' });
     }
@@ -204,6 +224,7 @@ router.post('/purchase', authenticate, async (req, res) => {
     
     res.json({
       message: `Purchased ${itemName}!`,
+      newBalance: user.stats.coins,
       coins: user.stats.coins,
       inventory: user.inventory
     });
