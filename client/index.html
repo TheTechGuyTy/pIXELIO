@@ -2476,6 +2476,34 @@
       document.body.appendChild(el);
     }
 
+    async function refreshProfile() {
+      if (isGuest || !authToken) return;
+      try {
+        const res  = await fetch('/api/auth/profile', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (data.id) {
+          // Merge fresh data into currentUser — preserve socket session data
+          currentUser = { ...currentUser, ...data };
+          updateUserDisplay();
+          // Refresh locker owned items
+          if (data.inventory) {
+            if (window.availableSkins) {
+              const owned = data.inventory.ownedSkins || ['default'];
+              Object.keys(window.availableSkins).forEach(k => {
+                window.availableSkins[k].owned = owned.includes(k);
+              });
+            }
+            if (window.playerLoadout && data.inventory.equippedSkin) {
+              window.playerLoadout.skin = data.inventory.equippedSkin;
+            }
+          }
+          updateMenuLockerPreview();
+        }
+      } catch(e) { console.error('refreshProfile error:', e); }
+    }
+
     function showMenuScreen() {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'block';
@@ -2486,6 +2514,8 @@
       window._chatOpen = false;
       updateUserDisplay();
       updateMenuLockerPreview();
+      // Refresh coins, skins, stats without tab reload
+      refreshProfile();
     }
 
     function updateMenuLockerPreview() {
@@ -4307,6 +4337,7 @@
           document.getElementById('coins-header').textContent = data.newBalance;
           document.getElementById('coins-display').textContent = data.newBalance;
           await loadShopItems(currentShopTab);
+          refreshProfile();
         } else {
           alert('❌ ' + (data.error || 'Purchase failed'));
         }
@@ -6975,6 +7006,7 @@
           if (!currentUser.profile.ownedProfilePics) currentUser.profile.ownedProfilePics = ['bot'];
           currentUser.profile.ownedProfilePics.push(avatarId);
           await equipAvatar(avatarId);
+          refreshProfile();
         } else {
           const err = await res.json();
           alert(err.error || 'Purchase failed');

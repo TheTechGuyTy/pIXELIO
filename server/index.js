@@ -719,6 +719,12 @@ io.on('connection', (socket) => {
     
     const game = games.get(gameId);
     if (!game || game.host !== socket.id || game.state !== 'lobby') return;
+
+    // Require at least 2 players
+    if (game.players.size < 2) {
+      socket.emit('error', { message: 'Need at least 2 players to start' });
+      return;
+    }
     
     // Check if all players are ready
     const allReady = Array.from(game.players.values()).every(p => p.isReady);
@@ -1441,24 +1447,41 @@ io.on('connection', (socket) => {
     if (gameId) {
       const game = games.get(gameId);
       if (game) {
-        game.players.delete(socket.id);
-        
-        if (game.players.size === 0) {
-          games.delete(gameId);
-          console.log(`🗑️ Game ${game.code} deleted (empty)`);
-        } else {
-          if (game.host === socket.id) {
-            game.host = Array.from(game.players.keys())[0];
+        if (game.state === 'playing') {
+          // During active game — mark dead, do not delete (prevents instant win on tab refresh)
+          const player = game.players.get(socket.id);
+          if (player && player.isAlive) {
+            player.isAlive = false;
+            player.disconnected = true;
+            game.killFeed.unshift({
+              killer: 'Disconnected',
+              victim: player.username,
+              weapon: 'disconnect',
+              timestamp: Date.now()
+            });
+            if (game.killFeed.length > 5) game.killFeed.pop();
           }
-          
-          io.to(gameId).emit('lobby-update', {
-            players: Array.from(game.players.values()),
-            host: game.host
-          });
+          playerGames.delete(socket.id);
+        } else {
+          // In lobby — remove normally
+          game.players.delete(socket.id);
+          if (game.players.size === 0) {
+            games.delete(gameId);
+            console.log(`🗑️ Game ${game.code} deleted (empty)`);
+          } else {
+            if (game.host === socket.id) {
+              game.host = Array.from(game.players.keys())[0];
+            }
+            io.to(gameId).emit('lobby-update', {
+              players: Array.from(game.players.values()),
+              host: game.host
+            });
+          }
+          playerGames.delete(socket.id);
         }
+      } else {
+        playerGames.delete(socket.id);
       }
-      
-      playerGames.delete(socket.id);
     }
     
     // Update user status in database

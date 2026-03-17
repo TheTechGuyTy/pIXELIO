@@ -333,7 +333,12 @@ class Pixelio3D {
 
   setMyPlayer(id, mapSize) {
     this.myPlayerId = id;
-    if (mapSize) this._mapHalf = mapSize / 2;
+    if (mapSize) {
+      this._mapHalf = mapSize / 2;
+      // Start at map center until first server update arrives
+      this._localX = 0;
+      this._localZ = 0;
+    }
     console.log('🎮 My player ID:', id);
   }
 
