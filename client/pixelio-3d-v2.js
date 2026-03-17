@@ -123,6 +123,8 @@ function buildPixelioCharacter(colorHex) {
 
   // Scale whole character to game size
   group.scale.setScalar(1.8);
+  // Lift so feet sit on ground (feet local y≈-12.8, × scale 1.8 = 23 units below origin)
+  group.position.y = 23;
 
   return group;
 }
@@ -300,7 +302,7 @@ class Pixelio3D {
     const t = performance.now() / 1000;
     const bobAmt = moving ? 1.8 : 0.4;
     const bobSpeed = moving ? 8 : 2;
-    me.group.position.y = Math.sin(t * bobSpeed) * bobAmt;
+    me.group.position.y = 23 + Math.sin(t * bobSpeed) * bobAmt;
   }
 
   updatePlayers(playersArray, mapSize) {
@@ -334,7 +336,7 @@ class Pixelio3D {
         // Other players: interpolate smoothly toward server position
         entry.x += (wx - entry.x) * 0.25;
         entry.y += (wz - entry.y) * 0.25;
-        entry.group.position.set(entry.x, 0, entry.y);
+        entry.group.position.set(entry.x, 23, entry.y);
         if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
           entry.group.rotation.y = Math.atan2(p.vx, p.vy);
         }

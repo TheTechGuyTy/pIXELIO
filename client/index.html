@@ -3652,10 +3652,11 @@
 
     function updateHUD() {
       if (!window._gameActive || !socket) return;
+      if (!window._lastPlayers || window._lastPlayers.length === 0) return;
 
-      // Find my player from last game update
-      const me = window._lastPlayers?.find(p => p.id === socket.id);
-      if (!me) return;
+      // Find my player — match by socket.id
+      const me = window._lastPlayers.find(p => p.id === socket.id);
+      if (!me) return; // not yet in server list, wait for next tick
 
       // Health bar
       const hp    = Math.max(0, me.health || 0);
@@ -5555,9 +5556,13 @@
         if (data.buildings) gameState.buildings = data.buildings;
         if (data.chests) gameState.chests = data.chests;
         
+        // Always update player list for HUD
+        if (data.players) {
+          window._lastPlayers = data.players;
+        }
+
         // UPDATE 3D ENGINE
         if (game3D && data.players && gameState.map) {
-          window._lastPlayers = data.players;
           game3D.updatePlayers(data.players, gameState.map.size);
           updateWeaponPickups3D();
         }
@@ -5865,6 +5870,11 @@
           if (data.id) {
             currentUser = data;
             connectToGame();
+            // Show admin button immediately if admin
+            if (data.isAdmin) {
+              const btn = document.getElementById('admin-button');
+              if (btn) btn.style.display = 'block';
+            }
           } else {
             localStorage.removeItem('authToken');
           }
