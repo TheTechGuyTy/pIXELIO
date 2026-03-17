@@ -237,18 +237,98 @@ class Pixelio3D {
   }
 
   _buildPlayerMesh(colorHex) {
+    // Fallback procedural model — used until FBX is loaded
     const group = buildPixelioCharacter(colorHex);
     group.rotation.y = Math.PI;
     return group;
   }
 
+  _applyColorToFBX(fbxGroup, colorHex) {
+    const color = new THREE.Color(colorHex);
+    fbxGroup.traverse(child => {
+      if (child.isMesh && child.material) {
+        // Clone material so each player has their own color
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        child.material = mats.map(m => {
+          const nm = m.clone();
+          nm.color = color;
+          return nm;
+        });
+        if (!Array.isArray(child.material) && mats.length === 1) {
+          child.material = child.material[0];
+        }
+        child.castShadow    = true;
+        child.receiveShadow = true;
+      }
+    });
+  }
+
   _spawnPlayer(socketId, skinId) {
     if (this.players.has(socketId)) return;
     const color = this.skinColors[skinId] || this.skinColors.default;
-    const group = this._buildPlayerMesh(color);
-    this.scene.add(group);
-    this.players.set(socketId, { group, x: 0, y: 0 });
-    console.log(`👤 Spawned: ${socketId} skin=${skinId}`);
+
+    if (window._fbxModelCache) {
+      // FBX already loaded — clone it
+      const fbx = window._fbxModelCache.clone();
+      this._applyColorToFBX(fbx, color);
+      this._fixFBXTransform(fbx);
+      this.scene.add(fbx);
+      this.players.set(socketId, { group: fbx, x: 0, y: 0, groundY: fbx.position.y });
+      console.log(`👤 Spawned (FBX): ${socketId}`);
+    } else if (!window._fbxLoading) {
+      // Start loading FBX, use procedural in meantime
+      const tempGroup = this._buildPlayerMesh(color);
+      this.scene.add(tempGroup);
+      this.players.set(socketId, { group: tempGroup, x: 0, y: 0, temp: true });
+
+      const engine = this;
+      loadFBXModel((fbx) => {
+        if (!fbx) return; // load failed, keep procedural
+        const entry = engine.players.get(socketId);
+        if (!entry) return; // player left
+        // Swap out temp model for real FBX
+        engine.scene.remove(entry.group);
+        engine._applyColorToFBX(fbx, color);
+        engine._fixFBXTransform(fbx);
+        fbx.position.x = entry.group.position.x;
+        fbx.position.z = entry.group.position.z;
+        fbx.rotation.y = entry.group.rotation.y;
+        engine.scene.add(fbx);
+        entry.group    = fbx;
+        entry.groundY  = fbx.position.y;
+        entry.temp     = false;
+        console.log(`🔄 Swapped to FBX: ${socketId}`);
+      });
+    } else {
+      // FBX loading in progress — use procedural
+      const group = this._buildPlayerMesh(color);
+      this.scene.add(group);
+      this.players.set(socketId, { group, x: 0, y: 0 });
+      console.log(`👤 Spawned (procedural): ${socketId}`);
+    }
+  }
+
+  _fixFBXTransform(fbx) {
+    // Blender FBX export quirks: scale is often 100x and rotated -90° on X
+    // Detect and correct automatically
+    const box = new THREE.Box3().setFromObject(fbx);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // Target height ~45 units (matches procedural model at scale 1.8)
+    const targetHeight = 45;
+    const scaleFactor  = maxDim > 0 ? targetHeight / maxDim : 1;
+    fbx.scale.setScalar(scaleFactor);
+
+    // Fix Blender's -90° X rotation on FBX export
+    fbx.rotation.x = 0;
+    fbx.rotation.y = Math.PI; // face forward
+
+    // Recalculate bounding box after scale fix and lift to ground
+    const box2 = new THREE.Box3().setFromObject(fbx);
+    const minY  = box2.min.y;
+    fbx.position.y = -minY; // feet on ground
   }
 
   setMyPlayer(id, mapSize) {
@@ -302,7 +382,8 @@ class Pixelio3D {
     const t = performance.now() / 1000;
     const bobAmt = moving ? 1.8 : 0.4;
     const bobSpeed = moving ? 8 : 2;
-    me.group.position.y = 23 + Math.sin(t * bobSpeed) * bobAmt;
+    const groundY = me.groundY ?? 23;
+      me.group.position.y = groundY + Math.sin(t * bobSpeed) * bobAmt;
   }
 
   updatePlayers(playersArray, mapSize) {
@@ -336,7 +417,7 @@ class Pixelio3D {
         // Other players: interpolate smoothly toward server position
         entry.x += (wx - entry.x) * 0.25;
         entry.y += (wz - entry.y) * 0.25;
-        entry.group.position.set(entry.x, 23, entry.y);
+        entry.group.position.set(entry.x, entry.groundY ?? 23, entry.y);
         if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
           entry.group.rotation.y = Math.atan2(p.vx, p.vy);
         }
@@ -524,11 +605,7 @@ function renderModelPreview(canvas, skinId, skinColors) {
 window.renderModelPreview = renderModelPreview;
 
 // ============ FBX MODEL LOADER ============
-// Loads /playermodel.fbx when Three.js FBXLoader is available.
-// Until the model is rigged, falls back to buildPixelioCharacter().
-// To enable: include FBXLoader.js before pixelio-3d-v2.js
-
-window._fbxModelCache = null;  // cached loaded FBX scene
+window._fbxModelCache = null;
 window._fbxLoading    = false;
 
 function loadFBXModel(onLoaded) {
@@ -540,33 +617,38 @@ function loadFBXModel(onLoaded) {
   }
 
   window._fbxLoading = true;
+  console.log('⏳ Loading FBX model...');
   const loader = new THREE.FBXLoader();
   loader.load('/playermodel.fbx',
     (fbx) => {
       console.log('✅ FBX loaded!');
-      // Normalize scale from Blender export
-      fbx.scale.setScalar(0.15);
-      fbx.traverse(child => {
-        if (child.isMesh) {
-          child.castShadow    = true;
-          child.receiveShadow = true;
-        }
-      });
       window._fbxModelCache = fbx;
       window._fbxLoading    = false;
       onLoaded(fbx.clone());
     },
-    undefined,
+    (xhr) => {
+      if (xhr.total) console.log(`FBX: ${Math.round(xhr.loaded/xhr.total*100)}%`);
+    },
     (err) => {
-      console.warn('FBX load failed, using procedural model:', err.message);
+      console.warn('FBX load failed, using procedural:', err.message || err);
       window._fbxLoading = false;
       onLoaded(null);
     }
   );
 }
 
-// Call this once your rigged FBX is ready to swap in
+// Pre-load FBX as soon as Three.js is ready
+window._fbxPreloadDone = false;
+function preloadFBX() {
+  if (window._fbxPreloadDone) return;
+  window._fbxPreloadDone = true;
+  loadFBXModel(() => console.log('FBX preload complete'));
+}
+// Call after page loads
+window.addEventListener('load', () => setTimeout(preloadFBX, 500));
+
 window.enableFBXModel = function() {
-  window._fbxModelCache = null; // clear cache to force reload
-  console.log('FBX model enabled — will load on next spawn');
+  window._fbxModelCache = null;
+  window._fbxPreloadDone = false;
+  preloadFBX();
 };
