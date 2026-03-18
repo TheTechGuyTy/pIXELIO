@@ -2661,6 +2661,7 @@
     function showMenuScreen() {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('menu-screen').style.display = 'block';
+      document.getElementById('menu-screen').style.zIndex = '100'; // stay behind end-screen
       hideHUD();
       const chat = document.getElementById('game-chat');
       if (chat) chat.style.display = 'none';
@@ -2668,7 +2669,6 @@
       window._chatOpen = false;
       updateUserDisplay();
       updateMenuLockerPreview();
-      // Refresh coins, skins, stats without tab reload
       refreshProfile();
       startMenuParticles();
     }
@@ -3342,7 +3342,8 @@
 
     function closeSettings() {
       document.getElementById('settings-modal').style.display = 'none';
-      showMenuScreen();
+      document.getElementById('menu-screen').style.display = 'block';
+      document.getElementById('menu-screen').style.zIndex = '100';
     }
 
     // ========== SETTINGS MANAGEMENT ==========
@@ -3830,10 +3831,12 @@
     function startMenuParticles() {
       const existing = document.getElementById('menu-particles');
       if (existing) return;
+      const menuEl = document.getElementById('menu-screen');
+      if (!menuEl) return;
       const canvas = document.createElement('canvas');
       canvas.id = 'menu-particles';
       canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:0.4;';
-      document.getElementById('menu-screen').prepend(canvas);
+      menuEl.prepend(canvas);
 
       const ctx = canvas.getContext('2d');
       canvas.width  = window.innerWidth;
@@ -3884,6 +3887,7 @@
       if (!currentSettings.soundEffects) return;
       try {
         const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
         const vol = (currentSettings.masterVolume ?? 0.7) * (currentSettings.sfxVolume ?? 0.7);
         const g   = ctx.createGain();
         g.connect(ctx.destination);
@@ -4253,7 +4257,7 @@
     }
     
     function closeShop() {
-      document.getElementById('shop-modal').style.display='none'; showMenuScreen();
+      document.getElementById('shop-modal').style.display='none'; document.getElementById('menu-screen').style.display='block';
     }
     
     // ========== LOCKER SYSTEM ==========
@@ -4264,7 +4268,7 @@
     }
     
     function closeLocker() {
-      document.getElementById('locker-modal').style.display='none'; showMenuScreen();
+      document.getElementById('locker-modal').style.display='none'; document.getElementById('menu-screen').style.display='block';
     }
     
     function switchLockerTab(tab) {
@@ -5907,8 +5911,9 @@
 
       socket.on('game-ended', (data) => {
         console.log('🎮 Game ended!', data);
-        if (!window._gameActive) return;
 
+        // Always clean up game state regardless of _gameActive
+        const wasActive = window._gameActive;
         window._gameActive = false;
         window._pixelioKeys = {};
         if (game3D) { game3D.destroy(); game3D = null; }
@@ -5917,14 +5922,19 @@
         if (chat) chat.style.display = 'none';
         hideHUD();
 
+        // Remove any existing end screen (e.g. eliminated screen)
+        const existing = document.getElementById('end-screen-overlay');
+        if (existing) existing.remove();
+
         if (data.winnerId === socket.id) {
+          // This client won
           showWinScreen(data.winner);
-        } else if (!document.getElementById('end-screen-overlay')) {
+        } else if (wasActive) {
+          // Was still alive but someone else won (shouldnt happen but handle it)
           showEliminatedScreen(data.winner || 'another player');
         }
-        // Show reward screen after end screen
+        // Reward screen after 2.5s
         setTimeout(() => showRewardScreen(data), 2500);
-        // Menu loads silently in background — end screen overlays it
         showMenuScreen();
       });
 

@@ -1,131 +1,71 @@
 // Builds a rounded humanoid matching the reference screenshot
 // Returns a THREE.Group — no GLB needed, pure geometry
 function buildPixelioCharacter(colorHex) {
-  const group = new THREE.Group();
-  const col   = colorHex || 0x8899cc;
+  // Simple, friendly default character - easy to read at game scale
+  const group   = new THREE.Group();
+  const col     = new THREE.Color(colorHex || 0x667eea);
+  const mat     = new THREE.MeshLambertMaterial({ color: col });
+  const darkCol = col.clone().multiplyScalar(0.6);
+  const darkMat = new THREE.MeshLambertMaterial({ color: darkCol });
+  const eyeMat  = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const pupMat  = new THREE.MeshLambertMaterial({ color: 0x111111 });
 
-  // Materials
-  const mat      = new THREE.MeshLambertMaterial({ color: col });
-  const darkMat  = new THREE.MeshLambertMaterial({ color: new THREE.Color(col).multiplyScalar(0.55) });
-  const eyeMat   = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const pupilMat = new THREE.MeshLambertMaterial({ color: 0x111122 });
-
-  function add(geo, m, x, y, z, rx, ry, rz) {
-    const mesh = new THREE.Mesh(geo, m);
-    mesh.position.set(x, y, z);
-    if (rx) mesh.rotation.x = rx;
-    if (ry) mesh.rotation.y = ry;
-    if (rz) mesh.rotation.z = rz;
-    mesh.castShadow = true;
-    group.add(mesh);
-    return mesh;
+  function mesh(geo, m, x, y, z) {
+    const o = new THREE.Mesh(geo, m);
+    o.position.set(x, y, z);
+    o.castShadow = true;
+    group.add(o);
+    return o;
   }
 
-  // ── HEAD ──────────────────────────────────────────────
-  // Main head — slightly squashed sphere
-  add(new THREE.SphereGeometry(5.2, 10, 8), mat, 0, 30, 0);
-  // Flatten top
-  add(new THREE.SphereGeometry(4.8, 10, 8), mat, 0, 33.5, 0);
-
+  // Head
+  mesh(new THREE.SphereGeometry(6, 12, 10), mat, 0, 28, 0);
   // Eyes
-  add(new THREE.SphereGeometry(1.4, 8, 6), eyeMat,   -2.2, 30.5, 4.8);
-  add(new THREE.SphereGeometry(1.4, 8, 6), eyeMat,    2.2, 30.5, 4.8);
-  add(new THREE.SphereGeometry(0.7, 8, 6), pupilMat, -2.2, 30.5, 5.8);
-  add(new THREE.SphereGeometry(0.7, 8, 6), pupilMat,  2.2, 30.5, 5.8);
+  mesh(new THREE.SphereGeometry(1.5, 8, 6), eyeMat, -2.5, 29, 5.2);
+  mesh(new THREE.SphereGeometry(1.5, 8, 6), eyeMat,  2.5, 29, 5.2);
+  mesh(new THREE.SphereGeometry(0.8, 8, 6), pupMat, -2.5, 29, 6.2);
+  mesh(new THREE.SphereGeometry(0.8, 8, 6), pupMat,  2.5, 29, 6.2);
+  // Smile
+  for (let i = -1; i <= 1; i += 0.5) {
+    mesh(new THREE.SphereGeometry(0.5, 6, 4), darkMat, i * 1.5, 25.5 + (i*i)*0.4, 5.8);
+  }
 
-  // ── NECK ──────────────────────────────────────────────
-  add(new THREE.CylinderGeometry(2.2, 2.5, 3, 8), darkMat, 0, 24.5, 0);
+  // Neck
+  mesh(new THREE.CylinderGeometry(2.5, 3, 4, 8), darkMat, 0, 22, 0);
 
-  // ── TORSO ─────────────────────────────────────────────
-  // Main torso block — rounded box using sphere-scaled box
-  const torsoGeo = new THREE.BoxGeometry(11, 14, 7);
-  add(torsoGeo, mat, 0, 16, 0);
-  // Chest bump
-  add(new THREE.SphereGeometry(3.5, 8, 6), mat, 0, 18, 3.2);
+  // Body
+  mesh(new THREE.CapsuleGeometry
+    ? new THREE.CapsuleGeometry(5, 10, 6, 12)
+    : new THREE.CylinderGeometry(5, 4.5, 14, 10),
+    mat, 0, 12, 0);
 
-  // Belt/waist divider
-  add(new THREE.CylinderGeometry(5, 4.5, 1.5, 8), darkMat, 0, 9.5, 0);
+  // Arms
+  const armGeo = new THREE.CapsuleGeometry
+    ? new THREE.CapsuleGeometry(2, 8, 4, 8)
+    : new THREE.CylinderGeometry(2, 1.8, 12, 8);
+  mesh(armGeo, mat, -8, 14, 0);
+  mesh(armGeo, mat,  8, 14, 0);
 
-  // ── UPPER ARMS ────────────────────────────────────────
-  // Shoulder balls
-  add(new THREE.SphereGeometry(3.2, 8, 6), mat, -7.5, 21, 0);
-  add(new THREE.SphereGeometry(3.2, 8, 6), mat,  7.5, 21, 0);
+  // Hands
+  mesh(new THREE.SphereGeometry(2.5, 8, 6), darkMat, -8, 6, 0);
+  mesh(new THREE.SphereGeometry(2.5, 8, 6), darkMat,  8, 6, 0);
 
-  // Upper arm cylinders (pill shape)
-  const uArmGeo = new THREE.CapsuleGeometry ? 
-    new THREE.CapsuleGeometry(2, 6, 6, 8) : 
-    new THREE.CylinderGeometry(2.2, 2.0, 7, 8);
-  add(uArmGeo, mat, -12, 18, 0, 0, 0, Math.PI * 0.12);
-  add(uArmGeo, mat,  12, 18, 0, 0, 0, -Math.PI * 0.12);
+  // Legs
+  const legGeo = new THREE.CapsuleGeometry
+    ? new THREE.CapsuleGeometry(2.5, 8, 4, 8)
+    : new THREE.CylinderGeometry(2.5, 2.2, 12, 8);
+  mesh(legGeo, darkMat, -3.5, 0, 0);
+  mesh(legGeo, darkMat,  3.5, 0, 0);
 
-  // Elbow joints
-  add(new THREE.SphereGeometry(2.0, 8, 6), darkMat, -15.5, 14.5, 0);
-  add(new THREE.SphereGeometry(2.0, 8, 6), darkMat,  15.5, 14.5, 0);
+  // Feet
+  const footGeo = new THREE.SphereGeometry(3, 8, 6);
+  const lf = new THREE.Mesh(footGeo, mat);
+  lf.scale.set(1.2, 0.6, 1.6); lf.position.set(-3.5, -6.5, 1.5);
+  lf.castShadow = true; group.add(lf);
+  const rf = lf.clone(); rf.position.set(3.5, -6.5, 1.5); group.add(rf);
 
-  // ── FOREARMS ─────────────────────────────────────────
-  const fArmGeo = new THREE.CylinderGeometry(1.8, 1.6, 6, 8);
-  add(fArmGeo, mat, -17.5, 11, 0, 0, 0, Math.PI * 0.08);
-  add(fArmGeo, mat,  17.5, 11, 0, 0, 0, -Math.PI * 0.08);
-
-  // ── HANDS ────────────────────────────────────────────
-  const handGeo = new THREE.SphereGeometry(2.2, 8, 6);
-  // Scale into hand shape
-  const lHand = new THREE.Mesh(handGeo, mat);
-  lHand.scale.set(1.4, 0.9, 0.7);
-  lHand.position.set(-19.5, 8, 0);
-  lHand.castShadow = true;
-  group.add(lHand);
-
-  const rHand = new THREE.Mesh(handGeo.clone(), mat);
-  rHand.scale.set(1.4, 0.9, 0.7);
-  rHand.position.set(19.5, 8, 0);
-  rHand.castShadow = true;
-  group.add(rHand);
-
-  // Thumb nubs
-  add(new THREE.SphereGeometry(0.9, 6, 4), mat, -21, 9.5, 1);
-  add(new THREE.SphereGeometry(0.9, 6, 4), mat,  21, 9.5, 1);
-
-  // ── PELVIS ────────────────────────────────────────────
-  add(new THREE.SphereGeometry(4.8, 8, 6), mat, 0, 7.5, 0);
-
-  // ── THIGHS ────────────────────────────────────────────
-  // Hip joints
-  add(new THREE.SphereGeometry(2.8, 8, 6), darkMat, -3.5, 5.5, 0);
-  add(new THREE.SphereGeometry(2.8, 8, 6), darkMat,  3.5, 5.5, 0);
-
-  const thighGeo = new THREE.CylinderGeometry(2.6, 2.2, 8, 8);
-  add(thighGeo, mat, -3.5, 0, 0);
-  add(thighGeo, mat,  3.5, 0, 0);
-
-  // ── KNEES ─────────────────────────────────────────────
-  add(new THREE.SphereGeometry(2.2, 8, 6), darkMat, -3.5, -4.5, 0);
-  add(new THREE.SphereGeometry(2.2, 8, 6), darkMat,  3.5, -4.5, 0);
-
-  // ── CALVES ────────────────────────────────────────────
-  const calfGeo = new THREE.CylinderGeometry(2.0, 1.8, 7, 8);
-  add(calfGeo, mat, -3.5, -8.5, 0);
-  add(calfGeo, mat,  3.5, -8.5, 0);
-
-  // ── FEET ──────────────────────────────────────────────
-  const footGeo = new THREE.SphereGeometry(2.4, 8, 6);
-  const lFoot = new THREE.Mesh(footGeo, mat);
-  lFoot.scale.set(0.9, 0.65, 1.4);
-  lFoot.position.set(-3.5, -12.8, 1);
-  lFoot.castShadow = true;
-  group.add(lFoot);
-
-  const rFoot = new THREE.Mesh(footGeo.clone(), mat);
-  rFoot.scale.set(0.9, 0.65, 1.4);
-  rFoot.position.set(3.5, -12.8, 1);
-  rFoot.castShadow = true;
-  group.add(rFoot);
-
-  // Scale whole character to game size
-  group.scale.setScalar(1.8);
-  // Lift so feet sit on ground (feet local y≈-12.8, × scale 1.8 = 23 units below origin)
-  group.position.y = 23;
-
+  group.scale.setScalar(1.6);
+  group.position.y = 11; // lift so feet are at ground
   return group;
 }
 
@@ -170,13 +110,12 @@ class Pixelio3D {
     container.appendChild(canvas);
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    const w = container.clientWidth  || window.innerWidth;
-    const h = container.clientHeight || window.innerHeight;
-    this.renderer.setSize(w, h);
+    // Always use window dimensions — container may be 0 if browser hasnt painted yet
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.camera.aspect = w / h;
+    this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
 
     // === LIGHTING — three-point setup for depth ===
@@ -388,7 +327,7 @@ class Pixelio3D {
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    const groundY  = me.groundY ?? 23;
+    const groundY  = me.groundY ?? 11;
     const t        = performance.now() / 1000;
     const bobAmt   = moving ? 1.8 : 0.4;
     const bobSpeed = moving ? 8 : 2;
@@ -432,7 +371,7 @@ class Pixelio3D {
         // Other players: interpolate smoothly toward server position
         entry.x += (wx - entry.x) * 0.25;
         entry.y += (wz - entry.y) * 0.25;
-        entry.group.position.set(entry.x, entry.groundY ?? 23, entry.y);
+        entry.group.position.set(entry.x, entry.groundY ?? 11, entry.y);
         if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
           entry.group.rotation.y = Math.atan2(p.vx, p.vy);
         }
