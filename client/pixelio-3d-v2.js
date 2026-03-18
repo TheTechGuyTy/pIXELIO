@@ -586,33 +586,71 @@ function renderModelPreview(canvas, skinId, skinColors) {
   if (!canvas || typeof THREE === 'undefined') return;
   if (canvas._previewCleanup) { canvas._previewCleanup(); canvas._previewCleanup = null; }
 
-  const w = canvas.width, h = canvas.height;
+  const w = canvas.width  || 160;
+  const h = canvas.height || 200;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setSize(w, h);
   renderer.setClearColor(0x000000, 0);
 
   const scene  = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-  camera.position.set(0, 18, 80);
-  camera.lookAt(0, 10, 0);
+  const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 2000);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
   sun.position.set(50, 80, 50);
   scene.add(sun);
 
   const colorHex = (skinColors && skinColors[skinId]) ? skinColors[skinId] : 0x8899cc;
-  const group = buildPixelioCharacter(colorHex);
-  scene.add(group);
 
   let frame, angle = 0;
-  function animate() {
-    frame = requestAnimationFrame(animate);
-    angle += 0.012;
-    group.rotation.y = angle;
-    renderer.render(scene, camera);
+
+  function startPreview(group) {
+    // Auto-fit camera to model
+    const box = new THREE.Box3().setFromObject(group);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    camera.position.set(center.x, center.y, center.z + maxDim * 1.6);
+    camera.lookAt(center);
+
+    function animate() {
+      frame = requestAnimationFrame(animate);
+      angle += 0.012;
+      group.rotation.y = angle;
+      renderer.render(scene, camera);
+    }
+    animate();
   }
-  animate();
+
+  if (window._fbxModelCache) {
+    const fbx = window._fbxModelCache.clone();
+    // Apply color tint
+    const col = new THREE.Color(colorHex);
+    fbx.traverse(child => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        child.material = mats.map(m => { const nm = m.clone(); nm.color = col; return nm; });
+        if (mats.length === 1 && Array.isArray(child.material)) child.material = child.material[0];
+      }
+    });
+    // Scale to preview size
+    const box = new THREE.Box3().setFromObject(fbx);
+    const sz = new THREE.Vector3(); box.getSize(sz);
+    const maxD = Math.max(sz.x, sz.y, sz.z);
+    if (maxD > 0) fbx.scale.setScalar(45 / maxD);
+    fbx.rotation.x = 0;
+    const box2 = new THREE.Box3().setFromObject(fbx);
+    fbx.position.y = -box2.min.y;
+    scene.add(fbx);
+    startPreview(fbx);
+  } else {
+    // Fallback procedural
+    const group = buildPixelioCharacter(colorHex);
+    scene.add(group);
+    startPreview(group);
+  }
 
   canvas._previewCleanup = () => { cancelAnimationFrame(frame); renderer.dispose(); };
 }
