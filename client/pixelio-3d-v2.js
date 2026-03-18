@@ -163,16 +163,21 @@ class Pixelio3D {
     // Camera starts behind — will be repositioned every frame
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 12000);
 
+    const container = document.getElementById('game-3d-container') || document.body;
     const canvas = document.createElement('canvas');
     canvas.id = 'pixelio-3d-canvas';
-    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:100;pointer-events:none;';
-    document.body.appendChild(canvas);
+    canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
+    container.appendChild(canvas);
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const w = container.clientWidth  || window.innerWidth;
+    const h = container.clientHeight || window.innerHeight;
+    this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
 
     // === LIGHTING — three-point setup for depth ===
     // Soft ambient — no harsh shadows in flat areas

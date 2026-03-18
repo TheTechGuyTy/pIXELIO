@@ -1053,18 +1053,26 @@
     }
 
     /* ========== LOBBY/GAME/POSTGAME (keeping existing styles) ========== */
-    #lobby-screen, #game-screen, #postgame-screen {
+    #lobby-screen, #postgame-screen {
       display: none;
     }
-    
-    #game-3d-container {
+
+    #game-screen {
+      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      z-index: 9999;
+      z-index: 500;
     }
+
+    #game-3d-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     
     #game-3d-container canvas {
       display: block;
@@ -2136,7 +2144,7 @@
   <div id="postgame-screen"></div>
 
   <!-- ===== IN-GAME HUD (overlays the 3D canvas) ===== -->
-  <div id="game-hud" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:200;pointer-events:none;font-family:inherit;">
+  <div id="game-hud" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:600;pointer-events:none;font-family:inherit;">
 
     <!-- Health + Shield bar (bottom left) -->
     <div style="position:absolute;bottom:30px;left:24px;width:260px;">
@@ -2198,7 +2206,7 @@
   </div>
 
 
-  <div id="game-chat" style="display:none; position:fixed; bottom:20px; left:20px; width:320px; height:280px; background:rgba(0,0,0,0.75); border-radius:12px; flex-direction:column; z-index:500; font-family:inherit;">
+  <div id="game-chat" style="display:none; position:fixed; bottom:20px; left:20px; width:320px; height:280px; background:rgba(0,0,0,0.75); border-radius:12px; flex-direction:column; z-index:610; font-family:inherit;">
     <div style="padding:8px 14px; background:rgba(102,126,234,0.6); border-radius:12px 12px 0 0; color:white; font-weight:bold; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
       💬 Chat <span style="font-size:11px; opacity:0.7;">Enter to send · Esc to close</span>
     </div>
