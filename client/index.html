@@ -5912,8 +5912,7 @@
       socket.on('game-ended', (data) => {
         console.log('🎮 Game ended!', data);
 
-        // Always clean up game state regardless of _gameActive
-        const wasActive = window._gameActive;
+        // Clean up game
         window._gameActive = false;
         window._pixelioKeys = {};
         if (game3D) { game3D.destroy(); game3D = null; }
@@ -5922,20 +5921,20 @@
         if (chat) chat.style.display = 'none';
         hideHUD();
 
-        // Remove any existing end screen (e.g. eliminated screen)
+        // Remove any previous end screen
         const existing = document.getElementById('end-screen-overlay');
         if (existing) existing.remove();
 
+        // Show correct screen — DO NOT call showMenuScreen() here
+        // The back button inside win/eliminated screen handles that
         if (data.winnerId === socket.id) {
-          // This client won
           showWinScreen(data.winner);
-        } else if (wasActive) {
-          // Was still alive but someone else won (shouldnt happen but handle it)
-          showEliminatedScreen(data.winner || 'another player');
+        } else {
+          showEliminatedScreen(data.killerName || data.winner || 'another player');
         }
-        // Reward screen after 2.5s
-        setTimeout(() => showRewardScreen(data), 2500);
-        showMenuScreen();
+
+        // Reward screen appears after the end screen
+        setTimeout(() => showRewardScreen(data), 3000);
       });
 
       // Admin broadcast notifications
