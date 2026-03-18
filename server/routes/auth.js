@@ -125,6 +125,12 @@ router.get('/profile', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     
+    // Auto-grant admin on profile fetch too (covers auto-login path)
+    if (!user.isAdmin && ADMIN_USERNAMES.map(u => u.toLowerCase()).includes(user.username.toLowerCase())) {
+      user.isAdmin = true;
+      await user.save();
+    }
+
     res.json({
       id: user._id,
       username: user.username,
@@ -140,6 +146,7 @@ router.get('/profile', authenticate, async (req, res) => {
       lastLogin: user.lastLogin,
       battleTicket: user.battleTicket,
       settings: user.settings,
+      isAdmin: user.isAdmin,
       profile: user.profile || { bio: '', profilePic: 'default', ownedProfilePics: ['default'] }
     });
   } catch (error) {

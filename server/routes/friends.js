@@ -102,13 +102,23 @@ router.post('/accept', authenticate, async (req, res) => {
     const request = user.friendRequests[requestIndex];
     const friendId = request.from;
     
-    // Add to both users' friend lists
-    user.friends.push({ userId: friendId });
+    // Add to both users' friend lists — check for duplicates first
+    const alreadyFriendsCheck = user.friends.some(f => f.userId.toString() === friendId.toString());
+    if (!alreadyFriendsCheck) {
+      user.friends.push({ userId: friendId });
+    }
     user.friendRequests.splice(requestIndex, 1);
+    // Also remove any reverse request
+    user.friendRequests = user.friendRequests.filter(r => r.from.toString() !== friendId.toString());
     await user.save();
     
     const friend = await User.findById(friendId);
-    friend.friends.push({ userId: req.userId });
+    const alreadyFriendsCheck2 = friend.friends.some(f => f.userId.toString() === req.userId.toString());
+    if (!alreadyFriendsCheck2) {
+      friend.friends.push({ userId: req.userId });
+    }
+    // Remove any pending request from the other direction
+    friend.friendRequests = friend.friendRequests.filter(r => r.from.toString() !== req.userId.toString());
     await friend.save();
     
     res.json({ message: 'Friend request accepted!' });
