@@ -335,9 +335,12 @@ class Pixelio3D {
     this.myPlayerId = id;
     if (mapSize) {
       this._mapHalf = mapSize / 2;
-      // Start at map center until first server update arrives
-      this._localX = 0;
-      this._localZ = 0;
+      this._localX  = 0;
+      this._localZ  = 0;
+    }
+    // Spawn local player immediately — don't wait for first game-update
+    if (!this.players.has(id)) {
+      this._spawnPlayer(id, 'default');
     }
     console.log('🎮 My player ID:', id);
   }
@@ -380,15 +383,17 @@ class Pixelio3D {
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    me.group.position.set(this._localX, 0, this._localZ);
-    me.group.rotation.y = this._localFacing + Math.PI;
-
-    // Subtle idle bob — gentle up/down so model feels alive without animation
-    const t = performance.now() / 1000;
-    const bobAmt = moving ? 1.8 : 0.4;
+    const groundY  = me.groundY ?? 23;
+    const t        = performance.now() / 1000;
+    const bobAmt   = moving ? 1.8 : 0.4;
     const bobSpeed = moving ? 8 : 2;
-    const groundY = me.groundY ?? 23;
-      me.group.position.y = groundY + Math.sin(t * bobSpeed) * bobAmt;
+
+    me.group.position.set(
+      this._localX,
+      groundY + Math.sin(t * bobSpeed) * bobAmt,
+      this._localZ
+    );
+    me.group.rotation.y = this._localFacing + Math.PI;
   }
 
   updatePlayers(playersArray, mapSize) {

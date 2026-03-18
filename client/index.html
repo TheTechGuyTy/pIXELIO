@@ -2483,24 +2483,46 @@
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const data = await res.json();
-        if (data.id) {
-          // Merge fresh data into currentUser — preserve socket session data
-          currentUser = { ...currentUser, ...data };
-          updateUserDisplay();
-          // Refresh locker owned items
-          if (data.inventory) {
-            if (window.availableSkins) {
-              const owned = data.inventory.ownedSkins || ['default'];
-              Object.keys(window.availableSkins).forEach(k => {
-                window.availableSkins[k].owned = owned.includes(k);
-              });
-            }
-            if (window.playerLoadout && data.inventory.equippedSkin) {
+        if (!data.id) return;
+
+        // Update fields in-place so references elsewhere still work
+        currentUser.stats     = data.stats;
+        currentUser.inventory = data.inventory;
+        currentUser.profile   = data.profile;
+        currentUser.battleTicket = data.battleTicket;
+        currentUser.isAdmin   = data.isAdmin ?? currentUser.isAdmin;
+
+        // Update coin/level displays immediately
+        updateUserDisplay();
+
+        // Sync owned skins with locker
+        if (data.inventory) {
+          const owned = data.inventory.ownedSkins || ['default'];
+
+          // Update old locker system if present
+          if (window.availableSkins) {
+            Object.keys(window.availableSkins).forEach(k => {
+              window.availableSkins[k].owned = owned.includes(k);
+            });
+          }
+
+          // Update new locker system
+          if (window.playerLoadout) {
+            if (data.inventory.equippedSkin) {
               window.playerLoadout.skin = data.inventory.equippedSkin;
             }
           }
-          updateMenuLockerPreview();
+
+          // Sync owned profile pics
+          if (data.profile?.ownedProfilePics && currentUser.profile) {
+            currentUser.profile.ownedProfilePics = data.profile.ownedProfilePics;
+            currentUser.profile.profilePic       = data.profile.profilePic;
+          }
         }
+
+        // Refresh locker preview with new skin
+        updateMenuLockerPreview();
+
       } catch(e) { console.error('refreshProfile error:', e); }
     }
 
@@ -6786,9 +6808,22 @@
       `;
     };
     
-    window.saveLoadout = function() {
+    window.saveLoadout = async function() {
       localStorage.setItem('pixelioLoadout', JSON.stringify(window.playerLoadout));
-      alert('✅ Loadout saved! Your skin and accessories will appear in-game!');
+
+      // Sync equipped skin to server so it persists
+      if (authToken && window.playerLoadout?.skin) {
+        try {
+          await fetch('/api/auth/profile', {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ equippedSkin: window.playerLoadout.skin })
+          });
+        } catch(e) { console.error('saveLoadout sync error:', e); }
+      }
+
+      updateMenuLockerPreview();
+      alert('✅ Loadout saved!');
     };
     
     window.drawLockerPreview = function() {
