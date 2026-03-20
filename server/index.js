@@ -587,8 +587,8 @@ io.on('connection', (socket) => {
       id: socket.id,
       userId: socket.userId,
       username: data.username || socket.username || 'Guest',
-      x: MAP_SIZE / 2,
-      y: MAP_SIZE / 2,
+      x: 200 + Math.random() * (MAP_SIZE - 400),
+      y: 200 + Math.random() * (MAP_SIZE - 400),
       health: 100,
       maxHealth: 100,
       shield: 0,
@@ -652,8 +652,8 @@ io.on('connection', (socket) => {
       id: socket.id,
       userId: socket.userId,
       username: data.username || socket.username || 'Guest',
-      x: game.map.size / 2 + Math.random() * 200 - 100,
-      y: game.map.size / 2 + Math.random() * 200 - 100,
+      x: 200 + Math.random() * (game.map.size - 400),
+      y: 200 + Math.random() * (game.map.size - 400),
       health: 100,
       maxHealth: 100,
       shield: 0,
@@ -1265,38 +1265,46 @@ io.on('connection', (socket) => {
   socket.on('player-input', (data) => {
     const gameId = playerGames.get(socket.id);
     if (!gameId) return;
-    
+
     const game = games.get(gameId);
     if (!game || game.state !== 'playing') return;
-    
+
     const player = game.players.get(socket.id);
     if (!player || !player.isAlive) return;
-    
-    // Calculate movement
-    const speed = 5;
-    let dx = 0;
-    let dy = 0;
-    
-    if (data.up) dy -= speed;
-    if (data.down) dy += speed;
-    if (data.left) dx -= speed;
-    if (data.right) dx += speed;
-    
-    // Normalize diagonal movement
-    if (dx !== 0 && dy !== 0) {
-      const magnitude = Math.sqrt(dx * dx + dy * dy);
-      dx = (dx / magnitude) * speed;
-      dy = (dy / magnitude) * speed;
-    }
-    
-    // Update position
-    player.x += dx;
-    player.y += dy;
-    
-    // Keep within map bounds
+
+    const speed   = 5;
     const mapSize = game.map.size;
-    player.x = Math.max(0, Math.min(mapSize, player.x));
-    player.y = Math.max(0, Math.min(mapSize, player.y));
+    const half    = mapSize / 2;
+
+    // Client sends authoritative position — use it with server-side sanity check
+    if (data.x !== undefined && data.y !== undefined) {
+      // Convert from world-space (centered) back to map-space
+      const clientX = data.x + half;
+      const clientZ = data.y + half; // engine Z maps to server Y
+
+      // Sanity: max movement per tick = speed * 2 (generous for lag)
+      const dist = Math.hypot(clientX - player.x, clientZ - player.y);
+      if (dist < speed * 8) {
+        player.x = Math.max(0, Math.min(mapSize, clientX));
+        player.y = Math.max(0, Math.min(mapSize, clientZ));
+      }
+    } else {
+      // Fallback: server-side movement from keys
+      let dx = 0, dy = 0;
+      if (data.up)    dy -= speed;
+      if (data.down)  dy += speed;
+      if (data.left)  dx -= speed;
+      if (data.right) dx += speed;
+      if (dx !== 0 && dy !== 0) {
+        const mag = Math.sqrt(dx*dx + dy*dy);
+        dx = (dx/mag)*speed; dy = (dy/mag)*speed;
+      }
+      player.x = Math.max(0, Math.min(mapSize, player.x + dx));
+      player.y = Math.max(0, Math.min(mapSize, player.y + dy));
+    }
+
+    // Store facing for other players to see
+    if (data.facing !== undefined) player.facing = data.facing;
     
     // Store mouse position for shooting
     if (data.mouseX !== undefined) player.mouseX = data.mouseX;
