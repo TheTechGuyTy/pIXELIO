@@ -81,13 +81,11 @@ class Pixelio3D {
     this.buildings  = [];
 
     // Client-side prediction state
-    this._localX      = null;
-    this._localZ      = null;
-    this._localFacing = 0;
-    this._cameraYaw   = 0;    // horizontal camera angle — mouse controlled
-    this._cameraPitch = 0.25; // vertical tilt (radians, fixed)
-    this._mapHalf     = 2500;
-    this._speed       = 5;    // must match server speed
+    this._localX    = null;  // predicted local player position
+    this._localZ    = null;
+    this._localFacing = 0;   // facing angle in radians
+    this._mapHalf   = 2500;
+    this._speed     = 5;     // must match server speed
 
     this.skinColors = {
       default: 0x8899cc, pink: 0xFF69B4, gold:   0xFFD700,
@@ -170,22 +168,7 @@ class Pixelio3D {
     grid.material.transparent = true;
     this.scene.add(grid);
 
-    this._clock  = new THREE.Clock();
-    this._socket = window._gameSocket; // set by game init
-    // Send input to server at 20hz
-    this._inputInterval = setInterval(() => {
-      if (!window._gameActive || !this._socket) return;
-      const k = window._pixelioKeys || {};
-      this._socket.emit('player-input', {
-        up:    !!(k['w'] || k['arrowup']),
-        down:  !!(k['s'] || k['arrowdown']),
-        left:  !!(k['a'] || k['arrowleft']),
-        right: !!(k['d'] || k['arrowright']),
-        x: this._localX,
-        y: this._localZ,
-        facing: this._cameraYaw
-      });
-    }, 50);
+    this._clock = new THREE.Clock();
     this._animate();
 
     window.addEventListener('resize', () => {
@@ -311,55 +294,50 @@ class Pixelio3D {
     if (!this.myPlayerId || !window._pixelioKeys || !window._gameActive) return;
     if (this._localX === null) return;
 
+    const frameSpeed = this._speed * (delta * 60);  // scale to 60fps baseline
+
+    const k = window._pixelioKeys;
+    let dx = 0, dz = 0;
+    if (k['w'] || k['arrowup'])    dz += frameSpeed;  // forward = +Z (away from camera)
+    if (k['s'] || k['arrowdown'])  dz -= frameSpeed;  // back = -Z
+    if (k['a'] || k['arrowleft'])  dx -= frameSpeed;  // left = -X
+    if (k['d'] || k['arrowright']) dx += frameSpeed;  // right = +X
+
+    // Normalize diagonal
+    if (dx !== 0 && dz !== 0) {
+      const mag = Math.sqrt(dx*dx + dz*dz);
+      dx = (dx / mag) * frameSpeed;
+      dz = (dz / mag) * frameSpeed;
+    }
+
+    const moving = dx !== 0 || dz !== 0;
+
+    if (moving) {
+      this._localX += dx;
+      this._localZ += dz;
+      // Smoothly rotate toward new facing direction instead of snapping
+      const targetFacing = Math.atan2(dx, dz);
+      // Shortest-path angle lerp
+      let diff = targetFacing - this._localFacing;
+      if (diff > Math.PI)  diff -= Math.PI * 2;
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      this._localFacing += diff * 0.4; // snappier turning
+    }
+
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    // ── MOUSE LOOK ──────────────────────────────────────────────────────
-    // Accumulate mouse X delta for camera yaw
-    if (window._mouseDX) {
-      this._cameraYaw -= window._mouseDX * 0.003; // sensitivity
-      window._mouseDX = 0;
-    }
-
-    // ── KEYBOARD MOVEMENT (relative to camera direction) ─────────────
-    const frameSpeed = this._speed * (delta * 60);
-    const k = window._pixelioKeys;
-
-    // Forward/back move along camera yaw, strafe is 90° from it
-    const fwdX = Math.sin(this._cameraYaw);
-    const fwdZ = Math.cos(this._cameraYaw);
-    const strX = Math.sin(this._cameraYaw + Math.PI / 2);
-    const strZ = Math.cos(this._cameraYaw + Math.PI / 2);
-
-    let moveX = 0, moveZ = 0;
-    if (k['w'] || k['arrowup'])    { moveX += fwdX; moveZ += fwdZ; }
-    if (k['s'] || k['arrowdown'])  { moveX -= fwdX; moveZ -= fwdZ; }
-    if (k['a'] || k['arrowleft'])  { moveX -= strX; moveZ -= strZ; }
-    if (k['d'] || k['arrowright']) { moveX += strX; moveZ += strZ; }
-
-    const moving = moveX !== 0 || moveZ !== 0;
-    if (moving) {
-      // Normalize diagonal
-      const mag = Math.sqrt(moveX * moveX + moveZ * moveZ);
-      this._localX += (moveX / mag) * frameSpeed;
-      this._localZ += (moveZ / mag) * frameSpeed;
-      // Character faces the direction of movement (camera yaw when moving fwd)
-      this._localFacing = this._cameraYaw;
-    }
-
-    // ── POSITION & BOB ───────────────────────────────────────────────
     const groundY  = me.groundY ?? 11;
     const t        = performance.now() / 1000;
-    const bobAmt   = moving ? 1.2 : 0.2;
-    const bobSpeed = moving ? 9 : 1.5;
+    const bobAmt   = moving ? 1.8 : 0.4;
+    const bobSpeed = moving ? 8 : 2;
 
     me.group.position.set(
       this._localX,
       groundY + Math.sin(t * bobSpeed) * bobAmt,
       this._localZ
     );
-    // Character faces direction of travel
-    me.group.rotation.y = this._localFacing;
+    me.group.rotation.y = this._localFacing + Math.PI;
   }
 
   updatePlayers(playersArray, mapSize) {
@@ -394,10 +372,7 @@ class Pixelio3D {
         entry.x += (wx - entry.x) * 0.25;
         entry.y += (wz - entry.y) * 0.25;
         entry.group.position.set(entry.x, entry.groundY ?? 11, entry.y);
-        // Use server facing if available, otherwise infer from velocity
-        if (p.facing !== undefined) {
-          entry.group.rotation.y = p.facing;
-        } else if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
+        if (p.vx !== undefined && p.vy !== undefined && (Math.abs(p.vx) + Math.abs(p.vy) > 0.1)) {
           entry.group.rotation.y = Math.atan2(p.vx, p.vy);
         }
       }
@@ -417,32 +392,25 @@ class Pixelio3D {
     const me = this.players.get(this.myPlayerId);
     if (!me) return;
 
-    const px = me.group.position.x;
-    const py = me.group.position.y;
-    const pz = me.group.position.z;
+    const camDist   = 180;
+    const camHeight = 120;
+    const facing    = this._localFacing || 0;
 
-    // Roblox-style third person: camera orbits behind player
-    // _cameraYaw  = horizontal angle (mouse left/right)
-    // _cameraPitch = vertical angle (fixed tilt down)
-    const camDist  = 22;   // units behind player
-    const camHeight = 8;   // units above player
+    // Camera sits BEHIND player: opposite of facing direction
+    // facing=0 means player faces +Z, so camera goes to -Z side
+    const targetX = me.group.position.x - Math.sin(facing) * camDist;
+    const targetZ = me.group.position.z - Math.cos(facing) * camDist;
 
-    const yaw   = this._cameraYaw;
-    const pitch = this._cameraPitch;
+    this.camera.position.x += (targetX - this.camera.position.x) * 0.15;
+    this.camera.position.z += (targetZ - this.camera.position.z) * 0.15;
+    this.camera.position.y += (camHeight - this.camera.position.y) * 0.15;
 
-    // Camera position: behind player based on yaw, elevated by pitch
-    const targetCamX = px - Math.sin(yaw) * camDist * Math.cos(pitch);
-    const targetCamY = py + camHeight + Math.sin(pitch) * camDist;
-    const targetCamZ = pz - Math.cos(yaw) * camDist * Math.cos(pitch);
-
-    // Smooth follow — fast enough to feel responsive
-    const lerpSpeed = 0.18;
-    this.camera.position.x += (targetCamX - this.camera.position.x) * lerpSpeed;
-    this.camera.position.y += (targetCamY - this.camera.position.y) * lerpSpeed;
-    this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpSpeed;
-
-    // Always look at player (slightly above feet for nice angle)
-    this.camera.lookAt(px, py + 6, pz);
+    // Look slightly ahead of player
+    this.camera.lookAt(
+      me.group.position.x + Math.sin(facing) * 50,
+      20,
+      me.group.position.z + Math.cos(facing) * 50
+    );
   }
 
   createBuildings(buildings, mapSize) {
@@ -538,14 +506,13 @@ class Pixelio3D {
   }
 
   destroy() {
-    if (this._inputInterval) { clearInterval(this._inputInterval); this._inputInterval = null; }
     if (this.renderer) {
       this.renderer.dispose();
       document.getElementById('pixelio-3d-canvas')?.remove();
     }
     this.players.clear();
     this.buildings = [];
-    document.exitPointerLock?.();alX = null;
+    this._localX = null;
     this._localZ = null;
     console.log('🗑️ 3D Engine destroyed');
   }
