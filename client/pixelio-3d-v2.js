@@ -34,15 +34,10 @@ function buildPixelioCharacter(colorHex) {
   mesh(new THREE.CylinderGeometry(2.5, 3, 4, 8), darkMat, 0, 22, 0);
 
   // Body
-  mesh(new THREE.CapsuleGeometry
-    ? new THREE.CapsuleGeometry(5, 10, 6, 12)
-    : new THREE.CylinderGeometry(5, 4.5, 14, 10),
-    mat, 0, 12, 0);
+  mesh(new THREE.CylinderGeometry(5, 4.5, 14, 10), mat, 0, 12, 0);
 
   // Arms
-  const armGeo = new THREE.CapsuleGeometry
-    ? new THREE.CapsuleGeometry(2, 8, 4, 8)
-    : new THREE.CylinderGeometry(2, 1.8, 12, 8);
+  const armGeo = new THREE.CylinderGeometry(2, 1.8, 12, 8);
   mesh(armGeo, mat, -8, 14, 0);
   mesh(armGeo, mat,  8, 14, 0);
 
@@ -51,9 +46,7 @@ function buildPixelioCharacter(colorHex) {
   mesh(new THREE.SphereGeometry(2.5, 8, 6), darkMat,  8, 6, 0);
 
   // Legs
-  const legGeo = new THREE.CapsuleGeometry
-    ? new THREE.CapsuleGeometry(2.5, 8, 4, 8)
-    : new THREE.CylinderGeometry(2.5, 2.2, 12, 8);
+  const legGeo = new THREE.CylinderGeometry(2.5, 2.2, 12, 8);
   mesh(legGeo, darkMat, -3.5, 0, 0);
   mesh(legGeo, darkMat,  3.5, 0, 0);
 
@@ -545,7 +538,8 @@ class Pixelio3D {
     }
     this.players.clear();
     this.buildings = [];
-    document.exitPointerLock?.();alX = null;
+    document.exitPointerLock?.();
+    this._localX = null;
     this._localZ = null;
     console.log('🗑️ 3D Engine destroyed');
   }
