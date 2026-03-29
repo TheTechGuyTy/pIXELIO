@@ -5012,11 +5012,8 @@
         if (gameState.buildings) game3D.createBuildings(gameState.buildings, gameState.map.size);
         showHUD();
         startHUDLoop();
-        // Pointer lock is requested when user clicks the canvas (see click handler above)
-        // Don't auto-request here - it breaks on some browsers without user gesture
       } catch(err) {
         console.error('Game init failed:', err);
-        alert('Game failed to start: ' + err.message);
         showMenuScreen();
       }
     }
